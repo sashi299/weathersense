@@ -43,6 +43,8 @@ class ForecastResponse(BaseModel):
 
 class WeatherCurrentResponse(BaseModel):
     city: str
+    state: Optional[str] = None
+    country: str
     temperature_c: float
     condition: str
     description: str
@@ -109,10 +111,44 @@ def get_current_weather(city: str) -> Dict[str, Any]:
     if not api_key:
         raise ValueError("OPENWEATHER_API_KEY is missing from environment. Please set it in your configuration.")
 
+    # 1. Resolve City via Geocoding API to get State and Country
     try:
+        geo_res = requests.get(
+            "http://api.openweathermap.org/geo/1.0/direct",
+            params={"q": validated_city, "limit": 1, "appid": api_key},
+            timeout=5
+        )
+        geo_data = geo_res.json()
+        if not geo_data:
+            raise ValueError(f"City '{validated_city}' not found.")
+
+        location = geo_data[0]
+        name = location.get("name")
+        state = location.get("state")
+        country = location.get("country")
+        lat = location.get("lat")
+        lon = location.get("lon")
+
+        display_name = f"{name}"
+        if state: display_name += f", {state}"
+        if country: display_name += f", {country}"
+
+    except Exception as exc:
+        logger.error(f"Geocoding failed for {validated_city}: {exc}")
+        # Fallback to direct weather search if geo fails
+        lat, lon, display_name, state, country = None, None, validated_city, None, "Unknown"
+
+    # 2. Fetch Weather Data (use lat/lon if available, else use q)
+    try:
+        params = {"appid": api_key, "units": "metric"}
+        if lat is not None and lon is not None:
+            params.update({"lat": lat, "lon": lon})
+        else:
+            params.update({"q": validated_city})
+
         response = requests.get(
             "https://api.openweathermap.org/data/2.5/weather",
-            params={"q": validated_city, "appid": api_key, "units": "metric"},
+            params=params,
             timeout=8,
         )
         if response.status_code == 401:
@@ -173,7 +209,9 @@ def get_current_weather(city: str) -> Dict[str, Any]:
     uv_index = round(base_uv * (1 - (clouds / 150)), 1)
 
     current_payload = {
-        "city": payload.get("name", validated_city),
+        "city": display_name,
+        "state": state,
+        "country": country,
         "temperature_c": round(payload.get("main", {}).get("temp", 0), 1),
         "condition": payload.get("weather", [{}])[0].get("main", "Clear"),
         "description": payload.get("weather", [{}])[0].get("description", "clear sky"),
@@ -280,6 +318,8 @@ def predict_next_7_days(city: str) -> Dict[str, Any]:
 def _build_fallback_weather(city: str) -> Dict[str, Any]:
     return {
         "city": city,
+        "state": "Fallback",
+        "country": "Unknown",
         "temperature_c": 22.0,
         "condition": "Cloudy",
         "description": "scattered clouds",
