@@ -50,6 +50,11 @@ class WeatherCurrentResponse(BaseModel):
     wind_speed: float
     icon: str
     cached_at: str
+    pressure: int
+    sunrise: str
+    sunset: str
+    uv_index: float
+    air_quality: str
 
 _MODELS: Dict[str, Any] = {}
 _METADATA: Dict[str, Any] = {}
@@ -134,6 +139,39 @@ def get_current_weather(city: str) -> Dict[str, Any]:
         return _build_fallback_weather(validated_city)
 
     payload = response.json()
+
+    # Extract coordinates for additional data
+    coord = payload.get("coord", {})
+    lat, lon = coord.get("lat"), coord.get("lon")
+    timezone_offset = payload.get("timezone", 0)
+
+    # Formatting helpers
+    def format_time(ts):
+        dt = datetime.fromtimestamp(ts, timezone.utc) + timedelta(seconds=timezone_offset)
+        return dt.strftime("%H:%M")
+
+    # Fetch Air Quality
+    air_quality = "Moderate"
+    if lat is not None and lon is not None:
+        try:
+            aq_res = requests.get(
+                "http://api.openweathermap.org/data/2.5/air_pollution",
+                params={"lat": lat, "lon": lon, "appid": api_key},
+                timeout=4
+            )
+            if aq_res.status_code == 200:
+                aqi = aq_res.json().get("list", [{}])[0].get("main", {}).get("aqi", 3)
+                air_quality = {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}.get(aqi, "Moderate")
+        except:
+            pass
+
+    # Simple heuristic for UV Index if One Call API is not available
+    # High at noon, low at night, reduced by cloud cover
+    hour = datetime.now(timezone.utc).hour + (timezone_offset // 3600)
+    clouds = payload.get("clouds", {}).get("all", 0)
+    base_uv = max(0, 10 - abs(hour % 24 - 13) * 1.5)
+    uv_index = round(base_uv * (1 - (clouds / 150)), 1)
+
     current_payload = {
         "city": payload.get("name", validated_city),
         "temperature_c": round(payload.get("main", {}).get("temp", 0), 1),
@@ -143,6 +181,11 @@ def get_current_weather(city: str) -> Dict[str, Any]:
         "wind_speed": float(payload.get("wind", {}).get("speed", 0)),
         "icon": payload.get("weather", [{}])[0].get("icon", "01d"),
         "cached_at": datetime.now(timezone.utc).isoformat(),
+        "pressure": int(payload.get("main", {}).get("pressure", 1013)),
+        "sunrise": format_time(payload.get("sys", {}).get("sunrise", 0)),
+        "sunset": format_time(payload.get("sys", {}).get("sunset", 0)),
+        "uv_index": uv_index,
+        "air_quality": air_quality,
     }
     _CURRENT_WEATHER_CACHE[cache_key] = (now, current_payload)
     return current_payload
@@ -244,4 +287,9 @@ def _build_fallback_weather(city: str) -> Dict[str, Any]:
         "wind_speed": 4.0,
         "icon": "03d",
         "cached_at": datetime.now(timezone.utc).isoformat(),
+        "pressure": 1012,
+        "sunrise": "06:00",
+        "sunset": "18:00",
+        "uv_index": 5.0,
+        "air_quality": "Good",
     }
