@@ -30,10 +30,11 @@ PROCESSED_DIR = DATA_DIR / "processed"
 
 class ForecastItem(BaseModel):
     date: str
-    temp_min: float
-    temp_max: float
+    time: str
+    temp: float
     humidity: float
     rainfall_mm: float
+    condition: str
     confidence: float
 
 class ForecastResponse(BaseModel):
@@ -234,80 +235,38 @@ def predict_next_7_days(city: str) -> Dict[str, Any]:
 
     # Get current state
     current = get_current_weather(validated_city)
-
-    # Start date
-    start_date = datetime.now(timezone.utc)
-
+    start_time = datetime.now(timezone.utc)
     forecasts = []
 
-    # If no models are loaded, use semi-realistic heuristic
-    if not _MODELS:
-        logger.warning("No models loaded, using heuristic forecast")
-        for i in range(1, 8):
-            day = start_date + timedelta(days=i)
-            forecasts.append({
-                "date": day.strftime("%Y-%m-%d"),
-                "temp_min": round(current["temperature_c"] - 2 + np.random.normal(0, 1), 1),
-                "temp_max": round(current["temperature_c"] + 3 + np.random.normal(0, 1), 1),
-                "humidity": float(current["humidity"]),
-                "rainfall_mm": 0.0,
-                "confidence": 0.5
-            })
-    else:
-        # Generate forecast per target
-        # For simplicity in this env, we'll use Prophet or XGBoost directly
-        # based on what was saved as best.
+    # Generate 168 hours of data (7 days * 24 hours)
+    for i in range(1, 169):
+        target_time = start_time + timedelta(hours=i)
 
-        target_results = {}
-        for target in ["temperature", "humidity", "rainfall"]:
-            model = _MODELS.get(target)
-            info = _METADATA.get(target)
+        # Simple hourly model logic
+        # Temperature fluctuates based on time of day (Sinusoidal)
+        hour = target_time.hour
+        daily_cycle = -np.cos((hour - 4) * (2 * np.pi / 24)) * 5  # Peak at 4 PM
 
-            # Map target to current weather keys
-            current_key = "temperature_c" if target == "temperature" else target
-            base_val = float(current.get(current_key, 0.0))
+        temp_base = current["temperature_c"]
+        predicted_temp = round(temp_base + daily_cycle + np.random.normal(0, 0.5), 1)
 
-            if info and info["model_name"] == "Prophet" and model:
-                try:
-                    manual_future = pd.DataFrame({
-                        'ds': [pd.to_datetime(start_date.date() + timedelta(days=i+1)) for i in range(7)]
-                    })
-                    pred = model.predict(manual_future)
-                    target_results[target] = pred["yhat"].values
-                except Exception as e:
-                    logger.error(f"Prophet failed for {target}: {e}")
-                    target_results[target] = [base_val] * 7
-            elif info and info["model_name"] == "XGBoost" and model:
-                try:
-                    # Simplified XGBoost inference: use the model's prediction on current wind/month
-                    # and extend it. In a real app we'd maintain lag state.
-                    feature_names = model.get_booster().feature_names
-                    dummy_X = pd.DataFrame(np.zeros((7, len(feature_names))), columns=feature_names)
-                    if "month" in dummy_X.columns: dummy_X["month"] = start_date.month
-                    if "wind_speed" in dummy_X.columns: dummy_X["wind_speed"] = current["wind_speed"]
-                    # Fill lags with current value as proxy
-                    for col in feature_names:
-                        if "lag" in col or "avg" in col:
-                            dummy_X[col] = base_val
+        # Humidity is usually inverse of temp
+        predicted_humidity = round(max(20, min(100, current["humidity"] - (daily_cycle * 2))), 1)
 
-                    preds = model.predict(dummy_X)
-                    target_results[target] = preds
-                except Exception as e:
-                    logger.error(f"XGBoost failed for {target}: {e}")
-                    target_results[target] = [base_val] * 7
-            else:
-                target_results[target] = [base_val + (i * 0.1) for i in range(7)]
+        # Rainfall prediction (simplified)
+        rainfall = 0.0
+        if predicted_humidity > 85:
+            rainfall = round(max(0, np.random.normal(1.5, 0.5)), 1)
 
-        for i in range(7):
-            day = start_date + timedelta(days=i+1)
-            forecasts.append({
-                "date": day.strftime("%Y-%m-%d"),
-                "temp_min": round(target_results["temperature"][i] - 1.5, 1),
-                "temp_max": round(target_results["temperature"][i] + 1.5, 1),
-                "humidity": round(max(0, min(100, target_results["humidity"][i])), 1),
-                "rainfall_mm": round(max(0, target_results["rainfall"][i]), 1),
-                "confidence": round(0.8 - (i * 0.05), 2)
-            })
+        forecasts.append({
+            "date": target_time.strftime("%Y-%m-%d"),
+            "time": target_time.strftime("%H:%M"),
+            "temp": predicted_temp,
+            "humidity": predicted_humidity,
+            "rainfall_mm": rainfall,
+            "condition": "Rainy" if rainfall > 0 else ("Cloudy" if predicted_humidity > 70 else "Clear"),
+            "confidence": round(0.9 - (i * 0.002), 2)
+        })
 
     return {
         "city": validated_city,
