@@ -13,10 +13,10 @@ except ImportError:  # pragma: no cover - support running from repository root
 
 try:
     from backend.ml.analytics import generate_analytics_report
-    from backend.ml.inference import ForecastResponse, WeatherCurrentResponse, get_current_weather, predict_next_7_days, validate_input
+    from backend.ml.inference import ForecastResponse, WeatherCurrentResponse, get_api_key, get_current_weather, predict_next_7_days, validate_input
 except ImportError:  # pragma: no cover - support running from backend directory
     from ml.analytics import generate_analytics_report
-    from ml.inference import ForecastResponse, WeatherCurrentResponse, get_current_weather, predict_next_7_days, validate_input
+    from ml.inference import ForecastResponse, WeatherCurrentResponse, get_api_key, get_current_weather, predict_next_7_days, validate_input
 
 load_dotenv()
 
@@ -34,15 +34,19 @@ app.add_middleware(
 
 SERVICE = ForecastService()
 # Load key from environment, ensure it is set
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "").strip()
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
 
 @app.get("/health")
 def health() -> dict:
-    if not OPENWEATHER_API_KEY:
-        return {"status": "degraded", "reason": "OPENWEATHER_API_KEY is missing"}
-    return {"status": "ok", "service": "WeatherSense"}
+    api_key = get_api_key()
+    if not api_key:
+        return {
+            "status": "degraded",
+            "reason": "Configuration error: OPENWEATHER_API_KEY is missing",
+            "action": "Please set OPENWEATHER_API_KEY in your environment variables."
+        }
+    return {"status": "ok", "service": "WeatherSense", "config": "verified"}
 
 
 @app.get("/current", response_model=WeatherCurrentResponse)
@@ -53,14 +57,18 @@ def get_current(city: str = Query(..., min_length=2)) -> WeatherCurrentResponse:
         payload = get_current_weather(validated_city)
         return WeatherCurrentResponse(**payload)
     except ValueError as exc:
-        logger.warning("Invalid city: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # Catch validation or configuration errors (like missing/invalid API key)
+        logger.warning("Configuration or input error: %s", exc)
+        status_code = 401 if "API Key" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     except TimeoutError as exc:
         logger.error("Current weather request timed out: %s", exc)
         raise HTTPException(status_code=504, detail="Weather API request timed out") from exc
     except RuntimeError as exc:
         logger.error("Current weather request failed: %s", exc)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        # 503 is more appropriate for upstream failures than 502 in many cases,
+        # but let's keep it clear.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/forecast", response_model=ForecastResponse)

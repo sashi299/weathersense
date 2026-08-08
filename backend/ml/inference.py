@@ -84,6 +84,15 @@ def load_inference_artifacts():
         else:
             logger.error(f"Model file {model_path} missing for target {target}")
 
+def get_api_key() -> str:
+    """Retrieve the OpenWeather API key from environment variables with alias support."""
+    keys = ["OPENWEATHER_API_KEY", "OPENWEATHERMAP_API_KEY", "OWM_API_KEY"]
+    for k in keys:
+        val = os.getenv(k, "").strip()
+        if val:
+            return val
+    return ""
+
 def get_current_weather(city: str) -> Dict[str, Any]:
     validated_city = validate_input(city)
     now = time.time()
@@ -91,9 +100,9 @@ def get_current_weather(city: str) -> Dict[str, Any]:
     if cache_key in _CURRENT_WEATHER_CACHE and now - _CURRENT_WEATHER_CACHE[cache_key][0] < 600:
         return _CURRENT_WEATHER_CACHE[cache_key][1]
 
-    api_key = os.getenv("OPENWEATHER_API_KEY", "").strip()
+    api_key = get_api_key()
     if not api_key:
-        raise RuntimeError("OPENWEATHER_API_KEY is missing from environment")
+        raise ValueError("OPENWEATHER_API_KEY is missing from environment. Please set it in your configuration.")
 
     try:
         response = requests.get(
@@ -102,10 +111,26 @@ def get_current_weather(city: str) -> Dict[str, Any]:
             timeout=8,
         )
         if response.status_code == 401:
-            raise RuntimeError("Invalid OpenWeather API Key")
+            raise ValueError("Invalid OpenWeather API Key. Please check your configuration.")
+
+        if response.status_code != 200:
+            logger.error(f"Weather API returned {response.status_code}: {response.text}")
+            if response.status_code >= 500:
+                raise RuntimeError(f"OpenWeather service error ({response.status_code})")
+            return _build_fallback_weather(validated_city)
+
         response.raise_for_status()
+    except requests.exceptions.Timeout:
+        logger.error("Weather API request timed out")
+        raise TimeoutError("Weather API request timed out")
+    except requests.exceptions.RequestException as exc:
+        logger.error(f"Weather API connection failed: {exc}")
+        raise RuntimeError(f"Could not connect to Weather API: {exc}")
+    except (ValueError, TimeoutError, RuntimeError):
+        # Re-raise known errors to be handled by the API layer
+        raise
     except Exception as exc:
-        logger.error(f"Weather API failed: {exc}")
+        logger.error(f"Unexpected error in weather request: {exc}")
         return _build_fallback_weather(validated_city)
 
     payload = response.json()
