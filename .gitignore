@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+frontend/build/
+frontend/.idea/
+frontend/.dart_tool/
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/key.properties
+frontend/android/.kotlin/
+frontend/android/.android/
+frontend/android/.android_home/
+frontend/android/.build_cache/
+frontend/android/.gradle_home/
+frontend/android/.local_home/
+frontend/android/app/src/main/res/values/google-services.json
+
+# Android
+*.jks
+*.keystore
+*.ap_
+*.apk
+*.aab
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.history/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Others
+.DS_Store
+Thumbs.db
+node_modules/
+.pytest_cache/

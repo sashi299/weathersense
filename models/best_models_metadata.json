@@ -1,0 +1,32 @@
+{
+    "temperature": {
+        "model_name": "XGBoost",
+        "filename": "temperature_best.joblib",
+        "metrics": {
+            "rmse": 0.33717890246289667,
+            "mae": 0.23746961750322299,
+            "mape": 1.0578725729241119,
+            "r2": 0.9959136621744524
+        }
+    },
+    "humidity": {
+        "model_name": "XGBoost",
+        "filename": "humidity_best.joblib",
+        "metrics": {
+            "rmse": 4.831031294951703,
+            "mae": 3.882761240005493,
+            "mape": 6.743103675847964,
+            "r2": 0.8914675116539001
+        }
+    },
+    "rainfall": {
+        "model_name": "XGBoost",
+        "filename": "rainfall_best.joblib",
+        "metrics": {
+            "rmse": 0.5145456130979819,
+            "mae": 0.1758845209686154,
+            "mape": 925888856.1269962,
+            "r2": 0.1891367432044776
+        }
+    }
+}
