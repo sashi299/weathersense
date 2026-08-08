@@ -7,5 +7,8 @@ COPY backend ./backend
 COPY data ./data
 COPY models ./models
 EXPOSE 8000
-# Use shell form to allow environment variable expansion (required for Railway's $PORT)
-CMD uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+COPY start.sh ./start.sh
+RUN chmod +x ./start.sh
+
+# Entrypoint script handles dynamic PORT expansion for Railway/Render
+CMD ["./start.sh"]
