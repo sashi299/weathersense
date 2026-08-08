@@ -60,6 +60,9 @@ def generate_analytics_report() -> Dict[str, Any]:
             "best_models": best_models
         }
 
+        # Ensure directory exists before saving
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
         # Save report
         with open(REPORTS_DIR / "analytics_report.json", "w") as f:
             json.dump(report, f, indent=4)
