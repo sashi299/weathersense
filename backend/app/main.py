@@ -139,9 +139,9 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
             logger.error("Search failed: OPENWEATHER_API_KEY is missing")
             return []
 
-        # Explicitly use the same logic that works in /current
+        # Try with limit=1 to see if it makes a difference (matching /current logic)
         url = "https://api.openweathermap.org/geo/1.0/direct"
-        params = {"q": q, "limit": 5, "appid": api_key}
+        params = {"q": q, "limit": 1, "appid": api_key}
         res = requests.get(url, params=params, timeout=5)
 
         if res.status_code == 200:
