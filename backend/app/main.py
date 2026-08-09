@@ -15,10 +15,10 @@ except ImportError:  # pragma: no cover - support running from repository root
 
 try:
     from backend.ml.analytics import generate_analytics_report
-    from backend.ml.inference import ForecastResponse, WeatherCurrentResponse, get_api_key, get_current_weather, predict_next_7_days, validate_input
+    from backend.ml.inference import ForecastResponse, WeatherCurrentResponse, get_api_key, get_current_weather, predict_next_7_days, validate_input, reverse_geocode
 except ImportError:  # pragma: no cover - support running from backend directory
     from ml.analytics import generate_analytics_report
-    from ml.inference import ForecastResponse, WeatherCurrentResponse, get_api_key, get_current_weather, predict_next_7_days, validate_input
+    from ml.inference import ForecastResponse, WeatherCurrentResponse, get_api_key, get_current_weather, predict_next_7_days, validate_input, reverse_geocode
 
 load_dotenv()
 
@@ -149,6 +149,15 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
     except Exception as exc:
         logger.error("Search failed: %s", exc)
         return []
+
+@app.get("/reverse")
+def reverse_geo(lat: float, lon: float) -> dict:
+    logger.info("GET /reverse lat=%s lon=%s", lat, lon)
+    try:
+        return reverse_geocode(lat, lon)
+    except Exception as exc:
+        logger.error("Reverse geo failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.post("/train")

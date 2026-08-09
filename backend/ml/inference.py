@@ -46,6 +46,8 @@ class WeatherCurrentResponse(BaseModel):
     city: str
     state: Optional[str] = None
     country: str
+    lat: Optional[float] = None
+    lon: Optional[float] = None
     temperature_c: float
     condition: str
     description: str
@@ -67,6 +69,32 @@ def validate_input(city: str) -> str:
     normalized = (city or "").strip()
     if not normalized: raise ValueError("City name is required")
     return normalized
+
+def reverse_geocode(lat: float, lon: float) -> Dict[str, Any]:
+    """Resolve coordinates to a human-readable location using OpenWeather Geocoding API."""
+    api_key = get_api_key()
+    if not api_key:
+        raise ValueError("API Key missing")
+
+    try:
+        url = "http://api.openweathermap.org/geo/1.0/reverse"
+        res = requests.get(url, params={"lat": lat, "lon": lon, "limit": 1, "appid": api_key}, timeout=5)
+        res.raise_for_status()
+        data = res.json()
+        if not data:
+            return {"name": f"{lat:.2f}, {lon:.2f}", "country": "Unknown", "lat": lat, "lon": lon}
+
+        location = data[0]
+        return {
+            "name": location.get("name"),
+            "state": location.get("state"),
+            "country": location.get("country"),
+            "lat": lat,
+            "lon": lon
+        }
+    except Exception as e:
+        logger.error(f"Reverse geocoding failed: {e}")
+        return {"name": f"{lat:.2f}, {lon:.2f}", "country": "Error", "lat": lat, "lon": lon}
 
 def load_inference_artifacts():
     """Load best models and metadata from disk."""
@@ -250,6 +278,8 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
         "city": display_name,
         "state": state,
         "country": country,
+        "lat": lat,
+        "lon": lon,
         "temperature_c": round(payload.get("main", {}).get("temp", 0), 1),
         "condition": condition,
         "description": payload.get("weather", [{}])[0].get("description", "clear sky"),
@@ -330,6 +360,8 @@ def _build_fallback_weather(city: str) -> Dict[str, Any]:
         "city": city,
         "state": "Fallback",
         "country": "Unknown",
+        "lat": 0.0,
+        "lon": 0.0,
         "temperature_c": 22.0,
         "condition": "Cloudy",
         "description": "scattered clouds",
