@@ -139,15 +139,19 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
             logger.error("Search failed: OPENWEATHER_API_KEY is missing")
             return []
 
-        # Try with limit=1 to see if it makes a difference (matching /current logic)
+        # Debugging what is being sent
+        logger.info("Calling OWM Search for: '%s' with key: %s...", q, api_key[:4])
         url = "https://api.openweathermap.org/geo/1.0/direct"
-        params = {"q": q, "limit": 1, "appid": api_key}
+        params = {"q": q, "limit": 5, "appid": api_key}
         res = requests.get(url, params=params, timeout=5)
 
         if res.status_code == 200:
             results = res.json()
-            logger.info("Search results for %s: %d", q, len(results))
+            logger.info("OWM returned %d results for '%s'", len(results), q)
             return results
+
+        logger.error("OWM returned status %d", res.status_code)
+        return []
 
         logger.error("Search API returned %s: %s", res.status_code, res.text)
         return []
