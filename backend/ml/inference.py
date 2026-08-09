@@ -198,7 +198,14 @@ def get_current_weather(city: str) -> Dict[str, Any]:
             )
             if aq_res.status_code == 200:
                 aqi = aq_res.json().get("list", [{}])[0].get("main", {}).get("aqi", 3)
-                air_quality = {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}.get(aqi, "Moderate")
+                # Map 1-5 index to a percentage (1 is best, 5 is worst)
+                # 1 -> 98%, 2 -> 80%, 3 -> 60%, 4 -> 40%, 5 -> 20%
+                purity_map = {1: 98, 2: 80, 3: 60, 4: 40, 5: 20}
+                label_map = {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}
+
+                purity = purity_map.get(aqi, 60)
+                label = label_map.get(aqi, "Moderate")
+                air_quality = f"{purity}% ({label})"
         except:
             pass
 
