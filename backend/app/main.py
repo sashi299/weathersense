@@ -100,6 +100,27 @@ def get_analytics() -> dict:
         raise HTTPException(status_code=500, detail="Analytics report could not be generated") from exc
 
 
+@app.get("/search")
+def search_cities(q: str = Query(..., min_length=2)) -> list:
+    logger.info("GET /search q=%s", q)
+    try:
+        api_key = get_api_key()
+        if not api_key:
+            return []
+
+        res = requests.get(
+            "http://api.openweathermap.org/geo/1.0/direct",
+            params={"q": q, "limit": 5, "appid": api_key},
+            timeout=5
+        )
+        if res.status_code == 200:
+            return res.json()
+        return []
+    except Exception as exc:
+        logger.error("Search failed: %s", exc)
+        return []
+
+
 @app.post("/train")
 def train_model(admin_key: Optional[str] = Header(default=None)) -> dict:
     if ADMIN_KEY and admin_key != ADMIN_KEY:
