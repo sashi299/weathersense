@@ -42,7 +42,8 @@ class ForecastResponse(BaseModel):
     generated_at: str
     forecast: List[ForecastItem] = Field(default_factory=list)
     resolution: str = "hourly"
-    model: str = "AI-Model"
+    model: Optional[str] = "AI-Model"
+    source: Optional[str] = "Open-Meteo"
 
 class WeatherCurrentResponse(BaseModel):
     city: str
