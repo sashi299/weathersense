@@ -139,21 +139,30 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
             logger.error("Search failed: OPENWEATHER_API_KEY is missing")
             return []
 
-        # Debugging what is being sent
-        logger.info("Calling OWM Search for: '%s' with key: %s...", q, api_key[:4])
-        url = "https://api.openweathermap.org/geo/1.0/direct"
-        params = {"q": q, "limit": 5, "appid": api_key}
+        # Use /data/2.5/find which is more reliable than /geo/1.0/direct for some regions
+        url = "https://api.openweathermap.org/data/2.5/find"
+        params = {"q": q, "cnt": 10, "appid": api_key, "units": "metric"}
         res = requests.get(url, params=params, timeout=5)
 
         if res.status_code == 200:
-            results = res.json()
-            logger.info("OWM returned %d results for '%s'", len(results), q)
+            data = res.json()
+            raw_list = data.get("list", [])
+            results = []
+            for item in raw_list:
+                results.append({
+                    "name": item.get("name"),
+                    "state": None, # /find doesn't return state
+                    "country": item.get("sys", {}).get("country"),
+                    "lat": item.get("coord", {}).get("lat"),
+                    "lon": item.get("coord", {}).get("lon")
+                })
+            logger.info("Search results for %s: %d", q, len(results))
             return results
 
-        logger.error("OWM returned status %d", res.status_code)
+        logger.error("Search API (find) returned status %d", res.status_code)
         return []
-
-        logger.error("Search API returned %s: %s", res.status_code, res.text)
+    except Exception as exc:
+        logger.error("Search failed for %s: %s", q, exc)
         return []
     except Exception as exc:
         logger.error("Search failed for %s: %s", q, exc)
