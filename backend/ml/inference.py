@@ -77,7 +77,7 @@ def reverse_geocode(lat: float, lon: float) -> Dict[str, Any]:
         raise ValueError("API Key missing")
 
     try:
-        url = "http://api.openweathermap.org/geo/1.0/reverse"
+        url = "https://api.openweathermap.org/geo/1.0/reverse"
         res = requests.get(url, params={"lat": lat, "lon": lon, "limit": 1, "appid": api_key}, timeout=5)
         res.raise_for_status()
         data = res.json()
@@ -149,7 +149,7 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
     if lat is None or lon is None:
         try:
             geo_res = requests.get(
-                "http://api.openweathermap.org/geo/1.0/direct",
+                "https://api.openweathermap.org/geo/1.0/direct",
                 params={"q": validated_city, "limit": 1, "appid": api_key},
                 timeout=5
             )
@@ -250,7 +250,7 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
     if lat is not None and lon is not None:
         try:
             aq_res = requests.get(
-                "http://api.openweathermap.org/data/2.5/air_pollution",
+                "https://api.openweathermap.org/data/2.5/air_pollution",
                 params={"lat": lat, "lon": lon, "appid": api_key},
                 timeout=4
             )

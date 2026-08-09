@@ -133,21 +133,28 @@ def get_analytics() -> dict:
 @app.get("/search")
 def search_cities(q: str = Query(..., min_length=2)) -> list:
     logger.info("GET /search q=%s", q)
-    try:
         api_key = get_api_key()
         if not api_key:
+            logger.error("Search failed: OPENWEATHER_API_KEY is missing")
             return []
 
+        logger.info("Using API key: %s...%s", api_key[:4], api_key[-4:])
+
         res = requests.get(
-            "http://api.openweathermap.org/geo/1.0/direct",
+            "https://api.openweathermap.org/geo/1.0/direct",
             params={"q": q, "limit": 5, "appid": api_key},
             timeout=5
         )
         if res.status_code == 200:
-            return res.json()
+            results = res.json()
+            logger.info("Search results for %s: %s", q, len(results))
+            return results
+
+        logger.error("Search API returned %s: %s", res.status_code, res.text)
         return []
     except Exception as exc:
-        logger.error("Search failed: %s", exc)
+        logger.error("Search failed for %s: %s", q, exc)
+        logger.error(traceback.format_exc())
         return []
 
 @app.get("/reverse")
