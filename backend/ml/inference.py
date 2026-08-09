@@ -53,6 +53,7 @@ class WeatherCurrentResponse(BaseModel):
     lon: Optional[float] = None
     temperature_c: float
     condition: str
+    condition_id: int
     description: str
     humidity: int
     wind_speed: float
@@ -223,6 +224,7 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
         return _build_fallback_weather(validated_city)
 
     payload = response.json()
+    logger.info(f"OWM raw response for {validated_city}: ID={payload.get('weather',[{}])[0].get('id')} main={payload.get('weather',[{}])[0].get('main')} desc={payload.get('weather',[{}])[0].get('description')}")
 
     # Extract basic info
     timezone_offset = payload.get("timezone", 0)
@@ -230,22 +232,44 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
     lat, lon = coord.get("lat"), coord.get("lon")
 
     # Extract condition for animation mapping
-    main_weather = payload.get("weather", [{}])[0].get("main", "Clear")
-    weather_id = payload.get("weather", [{}])[0].get("id", 800)
+    weather_info = payload.get("weather", [{}])[0]
+    weather_id = weather_info.get("id", 800)
+    main_weather = weather_info.get("main", "Clear")
 
-    # Map to internal conditions
+    # Map to internal conditions strictly by OWM groups
+    # Group 2xx: Thunderstorm
     if 200 <= weather_id <= 232:
         condition = "Thunderstorm"
-    elif 300 <= weather_id <= 531:
-        condition = "Rainy"
+    # Group 3xx: Drizzle
+    elif 300 <= weather_id <= 321:
+        condition = "Drizzle"
+    # Group 5xx: Rain
+    elif 500 <= weather_id <= 531:
+        # Check if it's actually raining (sanity check on precipitation field)
+        rain_data = payload.get("rain", {}).get("1h", 0)
+        if rain_data > 0 or weather_id in [502, 503, 504]:
+            condition = "Rainy"
+        else:
+            # Fallback to Cloudy if ID says Rain but no rainfall data (sometimes OWM is buggy)
+            condition = "Cloudy"
+    # Group 6xx: Snow
     elif 600 <= weather_id <= 622:
         condition = "Snowy"
+    # Group 7xx: Atmosphere
+    elif 701 <= weather_id <= 781:
+        if weather_id in [701, 741]: condition = "Fog"
+        else: condition = "Mist"
+    # Group 800: Clear
     elif weather_id == 800:
-        # Determine day/night based on local time
         local_hour = (datetime.now(timezone.utc).hour + (timezone_offset // 3600)) % 24
         condition = "Sunny" if 6 <= local_hour <= 18 else "Clear Night"
+    # Group 80x: Clouds
+    elif 801 <= weather_id <= 804:
+        condition = "Cloudy"
     else:
         condition = main_weather
+
+    logger.info(f"Mapped weather condition: {condition}")
 
     # Formatting helpers
     def format_time(ts):
@@ -289,6 +313,7 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
         "lon": lon,
         "temperature_c": round(payload.get("main", {}).get("temp", 0), 1),
         "condition": condition,
+        "condition_id": weather_id,
         "description": payload.get("weather", [{}])[0].get("description", "clear sky"),
         "humidity": int(payload.get("main", {}).get("humidity", 0)),
         "wind_speed": float(payload.get("wind", {}).get("speed", 0)),
@@ -437,6 +462,7 @@ def _build_fallback_weather(city: str) -> Dict[str, Any]:
         "lon": 0.0,
         "temperature_c": 22.0,
         "condition": "Cloudy",
+        "condition_id": 803,
         "description": "scattered clouds",
         "humidity": 60,
         "wind_speed": 4.0,

@@ -14,16 +14,26 @@ class WeatherBackground extends StatefulWidget {
 class _WeatherBackgroundState extends State<WeatherBackground> with TickerProviderStateMixin {
   late AnimationController _controller;
   late AnimationController _starController;
+  late AnimationController _fadeController;
+  
   final List<Particle> _particles = [];
   final List<Star> _stars = [];
   final Random _random = Random();
+  
   double _lightningOpacity = 0.0;
+  String _previousCondition = '';
+  String _currentCondition = '';
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat();
-    _starController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
+    _currentCondition = widget.condition;
+    _previousCondition = widget.condition;
+
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 10))..repeat();
+    _starController = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat(reverse: true);
+    _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..forward();
+
     _initParticles();
     _initStars();
   }
@@ -31,29 +41,29 @@ class _WeatherBackgroundState extends State<WeatherBackground> with TickerProvid
   void _initParticles() {
     _particles.clear();
     int count = 0;
-    if (widget.condition.contains('Rainy')) count = 100;
-    if (widget.condition.contains('Thunderstorm')) count = 120;
-    if (widget.condition.contains('Snowy')) count = 60;
-    if (widget.condition.contains('Fog')) count = 10;
+    if (_currentCondition.contains('Rainy') || _currentCondition.contains('Drizzle')) count = 120;
+    if (_currentCondition.contains('Thunderstorm')) count = 150;
+    if (_currentCondition.contains('Snowy')) count = 80;
+    if (_currentCondition.contains('Fog') || _currentCondition.contains('Mist') || _currentCondition.contains('Haze')) count = 15;
 
     for (int i = 0; i < count; i++) {
       _particles.add(Particle(
         x: _random.nextDouble(),
         y: _random.nextDouble(),
-        speed: 0.01 + _random.nextDouble() * 0.02,
-        size: 1 + _random.nextDouble() * 2,
+        speed: 0.005 + _random.nextDouble() * 0.025,
+        size: 0.8 + _random.nextDouble() * 2.5,
       ));
     }
   }
 
   void _initStars() {
     _stars.clear();
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 80; i++) {
       _stars.add(Star(
         x: _random.nextDouble(),
         y: _random.nextDouble(),
-        size: 0.5 + _random.nextDouble() * 1.5,
-        twinkleSpeed: 0.5 + _random.nextDouble(),
+        size: 0.3 + _random.nextDouble() * 1.8,
+        twinkleSpeed: 0.4 + _random.nextDouble() * 1.2,
       ));
     }
   }
@@ -62,6 +72,10 @@ class _WeatherBackgroundState extends State<WeatherBackground> with TickerProvid
   void didUpdateWidget(WeatherBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.condition != widget.condition) {
+      _previousCondition = oldWidget.condition;
+      _currentCondition = widget.condition;
+      _fadeController.reset();
+      _fadeController.forward();
       _initParticles();
     }
   }
@@ -70,16 +84,17 @@ class _WeatherBackgroundState extends State<WeatherBackground> with TickerProvid
   void dispose() {
     _controller.dispose();
     _starController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.condition.contains('Thunderstorm') && _random.nextDouble() > 0.985) {
+    if (_currentCondition.contains('Thunderstorm') && _random.nextDouble() > 0.99) {
       Future.delayed(Duration.zero, () {
         if (mounted) {
-          setState(() => _lightningOpacity = 0.4);
-          Future.delayed(const Duration(milliseconds: 80), () {
+          setState(() => _lightningOpacity = 0.3);
+          Future.delayed(const Duration(milliseconds: 100), () {
             if (mounted) setState(() => _lightningOpacity = 0.0);
           });
         }
@@ -88,11 +103,17 @@ class _WeatherBackgroundState extends State<WeatherBackground> with TickerProvid
 
     return Stack(
       children: [
-        // Base Background Color
-        Container(color: const Color(0xFF0B1220)),
+        // Base Ambient Gradient
+        _buildAmbientLayer(_previousCondition),
         
-        // Stars for Clear Night
-        if (widget.condition.contains('Clear Night'))
+        // Transition Overlay
+        FadeTransition(
+          opacity: _fadeController,
+          child: _buildAmbientLayer(_currentCondition),
+        ),
+
+        // Deep Space Layer (Stars)
+        if (_currentCondition.contains('Night'))
           AnimatedBuilder(
             animation: _starController,
             builder: (context, _) => CustomPaint(
@@ -101,85 +122,107 @@ class _WeatherBackgroundState extends State<WeatherBackground> with TickerProvid
             ),
           ),
 
-        // Sunny/Clear Glow
-        if (widget.condition.contains('Sunny') || widget.condition.contains('Clear'))
-          Positioned(
-            top: -150,
-            right: -150,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return Container(
-                  width: 500,
-                  height: 500,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFE8935A).withOpacity(0.08 + (_controller.value * 0.02)),
-                        blurRadius: 150,
-                        spreadRadius: 80,
-                      )
-                    ],
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFFE8935A).withOpacity(0.12),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+        // Sun / Moon / Atmosphere
+        _buildAtmosphericEffect(_currentCondition),
 
-        // Cloudy Blobs
-        if (widget.condition.contains('Cloudy') || widget.condition.contains('Overcast') || widget.condition.contains('Clouds'))
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) => CustomPaint(
-              painter: CloudPainter(progress: _controller.value, opacity: 0.04),
-              size: Size.infinite,
-            ),
-          ),
-
-        // Fog Layers
-        if (widget.condition.contains('Fog') || widget.condition.contains('Mist'))
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) => CustomPaint(
-              painter: FogPainter(progress: _controller.value),
-              size: Size.infinite,
-            ),
-          ),
-
-        // Animated Particles (Rain/Snow)
+        // Dynamic Particles (Rain, Snow, Fog)
         if (_particles.isNotEmpty)
           AnimatedBuilder(
             animation: _controller,
             builder: (context, _) => CustomPaint(
               painter: ParticlePainter(
                 particles: _particles,
-                condition: widget.condition,
+                condition: _currentCondition,
                 progress: _controller.value,
               ),
               size: Size.infinite,
             ),
           ),
 
-        // Lightning Flash
-        if (widget.condition.contains('Thunderstorm'))
+        // Flash Effect
+        if (_currentCondition.contains('Thunderstorm'))
           IgnorePointer(
             child: AnimatedOpacity(
               opacity: _lightningOpacity,
-              duration: const Duration(milliseconds: 40),
-              child: Container(color: Colors.white),
+              duration: const Duration(milliseconds: 50),
+              child: Container(color: Colors.white.withValues(alpha: 0.8)),
             ),
           ),
 
+        // The actual UI
         widget.child,
       ],
     );
+  }
+
+  Widget _buildAmbientLayer(String condition) {
+    final colors = _getAmbientColors(condition);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: colors,
+        ),
+      ),
+    );
+  }
+
+  List<Color> _getAmbientColors(String condition) {
+    if (condition.contains('Sunny') || condition.contains('Clear')) {
+      return condition.contains('Night') 
+        ? [const Color(0xFF040812), const Color(0xFF0B1220)] 
+        : [const Color(0xFF1E3A5F), const Color(0xFF0B1220)];
+    }
+    if (condition.contains('Rainy') || condition.contains('Thunderstorm') || condition.contains('Drizzle')) {
+      return [const Color(0xFF0F172A), const Color(0xFF020617)];
+    }
+    if (condition.contains('Cloudy') || condition.contains('Overcast') || condition.contains('Fog') || condition.contains('Mist') || condition.contains('Haze')) {
+      return [const Color(0xFF1E293B), const Color(0xFF0F172A)];
+    }
+    return [const Color(0xFF0B1220), const Color(0xFF020617)];
+  }
+
+  Widget _buildAtmosphericEffect(String condition) {
+    bool isDay = !condition.contains('Night');
+    
+    if (condition.contains('Sunny') || condition.contains('Clear') || condition.contains('Partly Cloudy')) {
+      return Positioned(
+        top: isDay ? -200 : -100,
+        right: isDay ? -200 : 0,
+        left: isDay ? null : 0,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            double pulse = sin(_controller.value * 2 * pi) * 0.05;
+            return Container(
+              width: 600,
+              height: 600,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: isDay 
+                    ? [const Color(0xFFE8935A).withValues(alpha: 0.15 + pulse), Colors.transparent]
+                    : [const Color(0xFF94A3B8).withValues(alpha: 0.1 + pulse), Colors.transparent],
+                ),
+              ),
+            );
+          }
+        ),
+      );
+    }
+    
+    if (condition.contains('Cloudy') || condition.contains('Overcast') || condition.contains('Clouds')) {
+      return AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => CustomPaint(
+          painter: CloudPainter(progress: _controller.value, isDay: isDay),
+          size: Size.infinite,
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
 
@@ -203,19 +246,20 @@ class ParticlePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = condition.contains('Snowy') ? Colors.white.withOpacity(0.5) : Colors.blue.withOpacity(0.3)
-      ..strokeWidth = 1.2
+      ..color = condition.contains('Snowy') ? Colors.white.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.25)
+      ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round;
 
     for (var p in particles) {
-      double currentY = (p.y + (progress * p.speed * 20)) % 1.0;
+      double currentY = (p.y + (progress * p.speed * 40)) % 1.0;
       double xPos = p.x * size.width;
       double yPos = currentY * size.height;
 
       if (condition.contains('Snowy')) {
         canvas.drawCircle(Offset(xPos, yPos), p.size, paint);
-      } else if (condition.contains('Rainy') || condition.contains('Thunderstorm')) {
-        canvas.drawLine(Offset(xPos, yPos), Offset(xPos, yPos + 12), paint);
+      } else if (condition.contains('Rainy') || condition.contains('Thunderstorm') || condition.contains('Drizzle')) {
+        // Rain - slanted lines
+        canvas.drawLine(Offset(xPos, yPos), Offset(xPos - 2, yPos + 15), paint);
       }
     }
   }
@@ -226,42 +270,19 @@ class ParticlePainter extends CustomPainter {
 
 class CloudPainter extends CustomPainter {
   final double progress;
-  final double opacity;
-  CloudPainter({required this.progress, required this.opacity});
+  final bool isDay;
+  CloudPainter({required this.progress, required this.isDay});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(opacity)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 60);
-
-    for (int i = 0; i < 6; i++) {
-      double x = (size.width * (i / 5) + (progress * 40)) % (size.width + 300) - 150;
-      double y = 80.0 + (i * 50);
-      canvas.drawCircle(Offset(x, y), 100 + (i * 15), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-class FogPainter extends CustomPainter {
-  final double progress;
-  FogPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
+      ..color = isDay ? Colors.white.withValues(alpha: 0.06) : Colors.blueGrey.withValues(alpha: 0.04)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 80);
 
-    for (int i = 0; i < 4; i++) {
-      double xOffset = sin(progress * 2 * pi + i) * 50;
-      canvas.drawRect(
-        Rect.fromLTWH(-100 + xOffset, size.height * (0.4 + i * 0.15), size.width + 200, 150),
-        paint
-      );
+    for (int i = 0; i < 5; i++) {
+      double x = (size.width * (i / 4) + (progress * 30)) % (size.width + 400) - 200;
+      double y = 100.0 + (i * 80);
+      canvas.drawCircle(Offset(x, y), 150 + (i * 20), paint);
     }
   }
 
@@ -277,8 +298,8 @@ class StarPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     for (var s in stars) {
-      final opacity = 0.2 + (sin(progress * 2 * pi * s.twinkleSpeed) + 1) * 0.4;
-      final paint = Paint()..color = Colors.white.withOpacity(opacity);
+      final opacity = 0.1 + (sin(progress * 2 * pi * s.twinkleSpeed) + 1) * 0.4;
+      final paint = Paint()..color = Colors.white.withValues(alpha: opacity);
       canvas.drawCircle(Offset(s.x * size.width, s.y * size.height), s.size, paint);
     }
   }

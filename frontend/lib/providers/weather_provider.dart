@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:weather_sense/services/api_service.dart';
@@ -13,7 +14,7 @@ class WeatherProvider extends ChangeNotifier {
   bool isCelsius = true;
   String lastCity = 'London';
 
-  Future<void> loadWeather(String city, {double? lat, double? lon}) async {
+  Future<void> loadWeather(String city, {double? lat, double? lon, Map<String, dynamic>? extra}) async {
     final normalizedCity = city.trim();
     if (normalizedCity.isEmpty) {
       errorMessage = 'Enter a city name';
@@ -23,6 +24,9 @@ class WeatherProvider extends ChangeNotifier {
 
     isLoading = true;
     errorMessage = '';
+    // Clear old weather to prevent stale state display
+    currentWeather = null;
+    forecast = null;
     notifyListeners();
 
     try {
@@ -37,7 +41,19 @@ class WeatherProvider extends ChangeNotifier {
       final canonicalName = current['city'] ?? normalizedCity;
       lastCity = canonicalName;
       await _saveLastCity(canonicalName);
-      await _saveHistory(canonicalName);
+
+      // Create history entry with full details
+      final historyEntry = {
+        'name': current['city'] ?? normalizedCity,
+        'state': current['state'],
+        'country': current['country'],
+        'lat': lat ?? current['lat'], // Backend might not return lat/lon in current weather yet
+        'lon': lon ?? current['lon'],
+      };
+      
+      if (extra != null) historyEntry.addAll(extra);
+      
+      await _saveHistory(json.encode(historyEntry));
     } catch (e) {
       errorMessage = e.toString();
     } finally {
@@ -87,10 +103,31 @@ class WeatherProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _saveHistory(String city) async {
+  Future<void> _saveHistory(String entryJson) async {
+    String newName;
+    try {
+      newName = json.decode(entryJson)['name'];
+    } catch (_) {
+      newName = entryJson;
+    }
+    
     final prefs = await SharedPreferences.getInstance();
-    final updated = [city, ...history.where((item) => item != city)].take(6).toList();
-    history = updated;
+    
+    final List<String> updatedHistory = [entryJson];
+    for (var item in history) {
+      String existingName;
+      try {
+        existingName = json.decode(item)['name'];
+      } catch (_) {
+        existingName = item;
+      }
+      
+      if (existingName != newName) {
+        updatedHistory.add(item);
+      }
+    }
+    
+    history = updatedHistory.take(10).toList(); // Store up to 10
     await prefs.setStringList('history', history);
   }
 
