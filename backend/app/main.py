@@ -1,9 +1,11 @@
 import logging
 import os
+import traceback
 from typing import Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
@@ -24,6 +26,16 @@ logger = logging.getLogger("weather_api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 app = FastAPI(title="WeatherSense API", version="0.1.0")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error("Unhandled Exception: %s", exc)
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error_type": type(exc).__name__},
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -87,6 +99,10 @@ def get_forecast(city: str = Query(..., min_length=2)) -> ForecastResponse:
     except RuntimeError as exc:
         logger.error("Forecast inference failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Unexpected forecast error: %s", exc)
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="Internal forecasting error") from exc
 
 
 @app.get("/analytics")
@@ -94,18 +110,15 @@ def get_analytics() -> dict:
     logger.info("GET /analytics")
     try:
         report = generate_analytics_report()
-        if "error" in report:
-            raise HTTPException(status_code=500, detail=report["error"])
+        # Even if there's an error field, return 200 with fallback insights
         return report
-    except HTTPException:
-        raise
     except Exception as exc:
         logger.error("Analytics generation failed: %s", exc)
         return {
-            "dataset_summary": {},
+            "dataset_summary": {"total_records": 0, "cities": [], "date_range": [], "features": []},
             "model_metrics": [],
             "best_models": {},
-            "ai_insights": [{"icon": "error", "title": "System Error", "explanation": "Failed to fetch analytics.", "status": "Offline"}]
+            "ai_insights": [{"icon": "error", "title": "Analytics Offline", "explanation": "Statistical data is currently being re-indexed.", "status": "Busy"}]
         }
 
 

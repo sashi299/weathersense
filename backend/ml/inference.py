@@ -177,6 +177,11 @@ def get_current_weather(city: str) -> Dict[str, Any]:
 
     payload = response.json()
 
+    # Extract basic info
+    timezone_offset = payload.get("timezone", 0)
+    coord = payload.get("coord", {})
+    lat, lon = coord.get("lat"), coord.get("lon")
+
     # Extract condition for animation mapping
     main_weather = payload.get("weather", [{}])[0].get("main", "Clear")
     weather_id = payload.get("weather", [{}])[0].get("id", 800)
@@ -189,14 +194,11 @@ def get_current_weather(city: str) -> Dict[str, Any]:
     elif 600 <= weather_id <= 622:
         condition = "Snowy"
     elif weather_id == 800:
-        condition = "Sunny" if 6 <= datetime.now(timezone.utc).hour + (timezone_offset // 3600) <= 18 else "Clear Night"
+        # Determine day/night based on local time
+        local_hour = (datetime.now(timezone.utc).hour + (timezone_offset // 3600)) % 24
+        condition = "Sunny" if 6 <= local_hour <= 18 else "Clear Night"
     else:
         condition = main_weather
-
-    # Extract coordinates for additional data
-    coord = payload.get("coord", {})
-    lat, lon = coord.get("lat"), coord.get("lon")
-    timezone_offset = payload.get("timezone", 0)
 
     # Formatting helpers
     def format_time(ts):
@@ -298,11 +300,11 @@ def predict_next_7_days(city: str) -> Dict[str, Any]:
         forecasts.append({
             "date": target_time.strftime("%Y-%m-%d"),
             "time": target_time.strftime("%H:%M"),
-            "temp": predicted_temp,
-            "humidity": predicted_humidity,
-            "rainfall_mm": rainfall,
+            "temp": float(predicted_temp),
+            "humidity": float(predicted_humidity),
+            "rainfall_mm": float(rainfall),
             "condition": condition,
-            "confidence": round(0.9 - (i * 0.002), 2)
+            "confidence": float(round(0.9 - (i * 0.002), 2))
         })
 
     return {
