@@ -1,96 +1,81 @@
 {
     "dataset_summary": {
-        "total_records": 4942,
+        "total_records": 80355,
         "cities": [
             "Bangalore",
-            "Delhi",
             "Chennai",
-            "Mumbai",
-            "Hyderabad"
+            "Delhi",
+            "Hyderabad",
+            "Mumbai"
         ],
         "date_range": [
-            "2019-01-01",
-            "2022-06-11"
+            "1981-01-01",
+            "2024-12-31"
         ],
         "features": [
             "date",
-            "city",
             "temperature",
             "humidity",
             "rainfall",
             "wind_speed",
-            "day_of_week",
-            "month",
-            "quarter",
-            "sin_day_of_year",
-            "cos_day_of_year",
-            "temperature_lag_1",
-            "temperature_lag_3",
-            "temperature_lag_7",
-            "humidity_lag_1",
-            "rainfall_lag_1",
-            "temperature_3day_avg",
-            "temperature_7day_avg",
-            "humidity_7day_avg",
-            "rainfall_7day_avg",
-            "temperature_7day_std",
-            "temperature_difference"
+            "pressure",
+            "city"
         ]
     },
     "model_metrics": [
         {
             "target": "temperature",
             "model": "Prophet",
-            "rmse": 6.5070146086,
-            "mae": 5.2051460164,
-            "mape": 24.1162500234,
-            "r2": -0.5218682124,
-            "training_time": 0.7652254105
+            "rmse": 5.5305995821,
+            "mae": 4.4990824257,
+            "mape": 18.1107281528,
+            "r2": -0.5838074989,
+            "training_time": 19.4564547539
         },
         {
             "target": "temperature",
             "model": "XGBoost",
-            "rmse": 0.3371789025,
-            "mae": 0.2374696175,
-            "mape": 1.0578725729,
-            "r2": 0.9959136622,
-            "training_time": 0.3034455776
+            "rmse": 0.1482886522,
+            "mae": 0.1058124551,
+            "mape": 0.4197600161,
+            "r2": 0.9988613931,
+            "training_time": 0.4517495632
         },
         {
             "target": "humidity",
             "model": "Prophet",
-            "rmse": 17.1080092162,
-            "mae": 14.0072529239,
-            "mape": 23.7550673278,
-            "r2": -0.3610656722,
-            "training_time": 0.6984438896
+            "rmse": 25.5839486949,
+            "mae": 20.362239357,
+            "mape": 52.2578872988,
+            "r2": -0.9382270274,
+            "training_time": 14.6627233028
         },
         {
             "target": "humidity",
             "model": "XGBoost",
-            "rmse": 4.831031295,
-            "mae": 3.88276124,
-            "mape": 6.7431036758,
-            "r2": 0.8914675117,
-            "training_time": 0.1334037781
+            "rmse": 4.2932752972,
+            "mae": 2.970761385,
+            "mape": 6.3921398459,
+            "r2": 0.9454183111,
+            "training_time": 0.2933576107
         },
         {
             "target": "rainfall",
             "model": "Prophet",
-            "rmse": 0.5872077759,
-            "mae": 0.2459288006,
-            "mape": 1260606118.9994824,
-            "r2": -0.0560475116,
-            "training_time": 0.6175806522
+            "rmse": 1.1322650334,
+            "mae": 0.8538410673,
+            "mape": 3836810299.1330595,
+            "r2": -0.2712660618,
+            "training_time": 11.0332896709
         },
         {
             "target": "rainfall",
             "model": "XGBoost",
-            "rmse": 0.5145456131,
-            "mae": 0.175884521,
-            "mape": 925888856.1269962,
-            "r2": 0.1891367432,
-            "training_time": 0.1169290543
+            "rmse": 0.7198042647,
+            "mae": 0.3919307669,
+            "mape": 542668060.9728347,
+            "r2": 0.4862295845,
+            "training_time": 0.2805902958
         }
     ],
     "best_models": {
@@ -98,30 +83,30 @@
             "model_name": "XGBoost",
             "filename": "temperature_best.joblib",
             "metrics": {
-                "rmse": 0.33717890246289667,
-                "mae": 0.23746961750322299,
-                "mape": 1.0578725729241119,
-                "r2": 0.9959136621744524
+                "rmse": 0.14828865216872464,
+                "mae": 0.1058124550839418,
+                "mape": 0.41976001608107677,
+                "r2": 0.9988613931362406
             }
         },
         "humidity": {
             "model_name": "XGBoost",
             "filename": "humidity_best.joblib",
             "metrics": {
-                "rmse": 4.831031294951703,
-                "mae": 3.882761240005493,
-                "mape": 6.743103675847964,
-                "r2": 0.8914675116539001
+                "rmse": 4.293275297206915,
+                "mae": 2.970761385005617,
+                "mape": 6.392139845901563,
+                "r2": 0.9454183111362688
             }
         },
         "rainfall": {
             "model_name": "XGBoost",
             "filename": "rainfall_best.joblib",
             "metrics": {
-                "rmse": 0.5145456130979819,
-                "mae": 0.1758845209686154,
-                "mape": 925888856.1269962,
-                "r2": 0.1891367432044776
+                "rmse": 0.7198042646708486,
+                "mae": 0.3919307668836684,
+                "mape": 542668060.9728347,
+                "r2": 0.4862295845090856
             }
         }
     }

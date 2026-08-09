@@ -77,6 +77,10 @@ class ApiService {
       }
 
       final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      return {};
     } catch (_) {
       return {};
     }

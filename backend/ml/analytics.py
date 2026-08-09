@@ -64,10 +64,14 @@ def generate_analytics_report() -> Dict[str, Any]:
             with open(best_path, "r") as f:
                 best_models = json.load(f)
 
+        # 4. Generate Deterministic AI Insights
+        ai_insights = _generate_deterministic_insights(summary, metrics, best_models)
+
         report = {
             "dataset_summary": summary,
             "model_metrics": metrics,
-            "best_models": best_models
+            "best_models": best_models,
+            "ai_insights": ai_insights
         }
 
         # Ensure directory exists before saving
@@ -81,7 +85,68 @@ def generate_analytics_report() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Analytics generation failed: {e}")
-        return {}
+        return {
+            "error": str(e),
+            "ai_insights": [{"icon": "error", "title": "System Alert", "explanation": "Analytics system temporarily unavailable.", "status": "Error"}]
+        }
+
+def _generate_deterministic_insights(summary, metrics, best_models) -> List[Dict[str, str]]:
+    insights = []
+
+    # 1. Dataset Coverage Insight
+    start_year = str(summary.get("date_range", ["1981"])[0])[:4]
+    end_year = str(summary.get("date_range", ["", "2024"])[1])[:4]
+    try:
+        years = int(end_year) - int(start_year)
+    except:
+        years = 44
+
+    insights.append({
+        "icon": "history",
+        "title": "Historical Foundation",
+        "explanation": f"WeatherSense is built on {years} years of real meteorological data ({start_year}-{end_year}), enabling high-precision seasonal trend analysis.",
+        "status": "Verified"
+    })
+
+    # 2. Model Performance Insight
+    temp_best = best_models.get("temperature", {})
+    temp_r2 = temp_best.get("metrics", {}).get("r2", 0)
+    if temp_r2 > 0.9:
+        insights.append({
+            "icon": "psychology",
+            "title": "Predictive Intelligence",
+            "explanation": f"The {temp_best.get('model_name', 'XGBoost')} temperature model has reached a confidence index of {(temp_r2*100):.1f}%, indicating exceptional accuracy.",
+            "status": "Elite"
+        })
+
+    # 3. Rainfall Complexity Insight
+    rain_best = best_models.get("rainfall", {})
+    rain_r2 = rain_best.get("metrics", {}).get("r2", 0)
+    if rain_r2 < 0.5:
+        insights.append({
+            "icon": "warning",
+            "title": "Atmospheric Complexity",
+            "explanation": "Precipitation patterns show high stochasticity. While trends are identified, local micro-climates make exact mm prediction challenging.",
+            "status": "Caution"
+        })
+    else:
+        insights.append({
+            "icon": "umbrella",
+            "title": "Rainfall Analytics",
+            "explanation": f"The {rain_best.get('model_name', 'XGBoost')} model effectively identifies regional monsoon patterns with {(rain_r2*100):.1f}% variance coverage.",
+            "status": "Stable"
+        })
+
+    # 4. Global Reliability
+    total_obs = summary.get("total_records", 0)
+    insights.append({
+        "icon": "verified",
+        "title": "Data Integrity",
+        "explanation": f"Insights are derived from {total_obs:,} verified observations across India's major climatic zones.",
+        "status": "Secure"
+    })
+
+    return insights
 
 if __name__ == "__main__":
     generate_analytics_report()

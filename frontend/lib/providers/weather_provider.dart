@@ -70,6 +70,20 @@ class WeatherProvider extends ChangeNotifier {
 
   String get tempUnit => isCelsius ? '°C' : '°F';
 
+  Future<void> refreshAnalytics() async {
+    isLoading = true;
+    errorMessage = '';
+    notifyListeners();
+    try {
+      analytics = await _apiService.getAnalytics();
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> _saveHistory(String city) async {
     final prefs = await SharedPreferences.getInstance();
     final updated = [city, ...history.where((item) => item != city)].take(6).toList();

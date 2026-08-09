@@ -94,10 +94,19 @@ def get_analytics() -> dict:
     logger.info("GET /analytics")
     try:
         report = generate_analytics_report()
+        if "error" in report:
+            raise HTTPException(status_code=500, detail=report["error"])
         return report
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Analytics generation failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Analytics report could not be generated") from exc
+        return {
+            "dataset_summary": {},
+            "model_metrics": [],
+            "best_models": {},
+            "ai_insights": [{"icon": "error", "title": "System Error", "explanation": "Failed to fetch analytics.", "status": "Offline"}]
+        }
 
 
 @app.get("/search")

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:weather_sense/providers/weather_provider.dart';
+import 'package:weather_sense/services/api_service.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
