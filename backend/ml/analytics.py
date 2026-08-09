@@ -44,8 +44,15 @@ def generate_analytics_report() -> Dict[str, Any]:
         metrics_path = REPORTS_DIR / "model_metrics.json"
         metrics = []
         if metrics_path.exists():
-            with open(metrics_path, "r") as f:
-                metrics = json.load(f)
+            try:
+                with open(metrics_path, "r") as f:
+                    metrics = json.load(f)
+            except Exception as e:
+                logger.error(f"Error reading model_metrics.json: {e}")
+                metrics = [{"info": "Error reading metrics file"}]
+        else:
+            logger.warning("model_metrics.json not found, returning empty metrics list")
+            metrics = [{"info": "Model performance data currently unavailable"}]
 
         # 3. Best models
         best_path = MODELS_DIR / "best_models_metadata.json"

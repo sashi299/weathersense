@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend ./backend
 COPY data ./data
 COPY models ./models
+COPY reports ./reports
 EXPOSE 8000
 COPY start.sh ./start.sh
 RUN chmod +x ./start.sh
