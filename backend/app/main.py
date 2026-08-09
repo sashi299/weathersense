@@ -140,24 +140,13 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
             logger.error("Search failed: API Key missing")
             return []
 
-        import requests
-        # Use /data/2.5/find which is reliable and consistent with other endpoints
-        url = "https://api.openweathermap.org/data/2.5/find"
-        params = {"q": q, "cnt": 10, "appid": api_key, "units": "metric"}
+        # Use /geo/1.0/direct to get State/Region information
+        url = "https://api.openweathermap.org/geo/1.0/direct"
+        params = {"q": q, "limit": 10, "appid": api_key}
         res = requests.get(url, params=params, timeout=5)
 
         if res.status_code == 200:
-            data = res.json()
-            raw_list = data.get("list", [])
-            results = []
-            for item in raw_list:
-                results.append({
-                    "name": item.get("name"),
-                    "state": None,
-                    "country": item.get("sys", {}).get("country"),
-                    "lat": item.get("coord", {}).get("lat"),
-                    "lon": item.get("coord", {}).get("lon")
-                })
+            results = res.json()
             logger.info("Search results for %s: %d", q, len(results))
             return results
 
