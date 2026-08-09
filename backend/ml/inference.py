@@ -63,6 +63,10 @@ class WeatherCurrentResponse(BaseModel):
     sunset: str
     uv_index: float
     air_quality: str
+    moon_phase: str
+    moon_illumination: int
+    moonrise: str
+    moonset: str
 
 _MODELS: Dict[str, Any] = {}
 _METADATA: Dict[str, Any] = {}
@@ -296,6 +300,51 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
         "uv_index": uv_index,
         "air_quality": air_quality,
     }
+
+    # 3. Fetch Astronomical Data (Moon Phase/Rise/Set) from Open-Meteo
+    try:
+        astro_url = "https://api.open-meteo.com/v1/astronomy"
+        astro_params = {
+            "latitude": lat or coord.get("lat"),
+            "longitude": lon or coord.get("lon"),
+            "daily": "sunrise,sunset,moonrise,moonset",
+            "timezone": "auto"
+        }
+        astro_res = requests.get(astro_url, params=astro_params, timeout=5)
+        if astro_res.status_code == 200:
+            astro_data = astro_res.json().get("daily", {})
+            # We take index 0 (today)
+            current_payload["moonrise"] = (astro_data.get("moonrise", ["--:--"])[0] or "").split("T")[-1]
+            current_payload["moonset"] = (astro_data.get("moonset", ["--:--"])[0] or "").split("T")[-1]
+    except Exception as e:
+        logger.error(f"Astronomy fetch failed: {e}")
+
+    # Calculate Moon Phase & Illumination (Simple Heuristic for now if not in API)
+    # Using the date to estimate phase
+    from datetime import date
+    def get_moon_phase(d):
+        diff = d - date(2001, 1, 1)
+        days = diff.days
+        lunations = days / 29.53058867
+        phase = lunations % 1
+        if phase < 0.0625 or phase > 0.9375: return "New Moon", 0
+        if phase < 0.1875: return "Waxing Crescent", 25
+        if phase < 0.3125: return "First Quarter", 50
+        if phase < 0.4375: return "Waxing Gibbous", 75
+        if phase < 0.5625: return "Full Moon", 100
+        if phase < 0.6875: return "Waning Gibbous", 75
+        if phase < 0.8125: return "Third Quarter", 50
+        if phase < 0.9375: return "Waning Crescent", 25
+        return "Full Moon", 100
+
+    m_phase, m_ill = get_moon_phase(datetime.now().date())
+    current_payload["moon_phase"] = m_phase
+    current_payload["moon_illumination"] = m_ill
+
+    # Ensure defaults
+    current_payload.setdefault("moonrise", "--:--")
+    current_payload.setdefault("moonset", "--:--")
+
     _CURRENT_WEATHER_CACHE[cache_key] = (now, current_payload)
     return current_payload
 
