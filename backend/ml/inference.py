@@ -101,10 +101,13 @@ def get_api_key() -> str:
             return val
     return ""
 
-def get_current_weather(city: str) -> Dict[str, Any]:
+def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[float] = None) -> Dict[str, Any]:
     validated_city = validate_input(city)
     now = time.time()
-    cache_key = validated_city.lower()
+
+    # Use coordinates in cache key if provided to avoid collisions for same-named cities
+    cache_key = f"{validated_city.lower()}_{lat}_{lon}" if lat is not None else validated_city.lower()
+
     if cache_key in _CURRENT_WEATHER_CACHE and now - _CURRENT_WEATHER_CACHE[cache_key][0] < 600:
         return _CURRENT_WEATHER_CACHE[cache_key][1]
 
@@ -112,32 +115,41 @@ def get_current_weather(city: str) -> Dict[str, Any]:
     if not api_key:
         raise ValueError("OPENWEATHER_API_KEY is missing from environment. Please set it in your configuration.")
 
-    # 1. Resolve City via Geocoding API to get State and Country
-    try:
-        geo_res = requests.get(
-            "http://api.openweathermap.org/geo/1.0/direct",
-            params={"q": validated_city, "limit": 1, "appid": api_key},
-            timeout=5
-        )
-        geo_data = geo_res.json()
-        if not geo_data:
-            raise ValueError(f"City '{validated_city}' not found.")
+    display_name, state, country = validated_city, None, "Unknown"
 
-        location = geo_data[0]
-        name = location.get("name")
-        state = location.get("state")
-        country = location.get("country")
-        lat = location.get("lat")
-        lon = location.get("lon")
+    # 1. Resolve City via Geocoding API if lat/lon not provided
+    if lat is None or lon is None:
+        try:
+            geo_res = requests.get(
+                "http://api.openweathermap.org/geo/1.0/direct",
+                params={"q": validated_city, "limit": 1, "appid": api_key},
+                timeout=5
+            )
+            geo_data = geo_res.json()
+            if not geo_data:
+                raise ValueError(f"City '{validated_city}' not found.")
 
-        display_name = f"{name}"
-        if state: display_name += f", {state}"
-        if country: display_name += f", {country}"
+            location = geo_data[0]
+            name = location.get("name")
+            state = location.get("state")
+            country = location.get("country")
+            lat = location.get("lat")
+            lon = location.get("lon")
 
-    except Exception as exc:
-        logger.error(f"Geocoding failed for {validated_city}: {exc}")
-        # Fallback to direct weather search if geo fails
-        lat, lon, display_name, state, country = None, None, validated_city, None, "Unknown"
+            display_name = f"{name}"
+            if state: display_name += f", {state}"
+            if country: display_name += f", {country}"
+
+        except Exception as exc:
+            logger.error(f"Geocoding failed for {validated_city}: {exc}")
+            if "not found" in str(exc): raise
+            # Fallback to direct weather search if geo fails
+            lat, lon, display_name, state, country = None, None, validated_city, None, "Unknown"
+    else:
+        # If lat/lon provided, we can optionally reverse geocode or just use provided city name
+        # For simplicity, we'll trust the provided name or fetch it if needed.
+        # But we must have lat/lon for the actual weather call.
+        display_name = validated_city
 
     # 2. Fetch Weather Data (use lat/lon if available, else use q)
     try:
@@ -254,12 +266,12 @@ def get_current_weather(city: str) -> Dict[str, Any]:
     _CURRENT_WEATHER_CACHE[cache_key] = (now, current_payload)
     return current_payload
 
-def predict_next_7_days(city: str) -> Dict[str, Any]:
+def predict_next_7_days(city: str, lat: Optional[float] = None, lon: Optional[float] = None) -> Dict[str, Any]:
     validated_city = validate_input(city)
     load_inference_artifacts()
 
     # Get current state
-    current = get_current_weather(validated_city)
+    current = get_current_weather(validated_city, lat=lat, lon=lon)
     start_time = datetime.now(timezone.utc)
     forecasts = []
 

@@ -62,11 +62,15 @@ def health() -> dict:
 
 
 @app.get("/current", response_model=WeatherCurrentResponse)
-def get_current(city: str = Query(..., min_length=2)) -> WeatherCurrentResponse:
-    logger.info("GET /current city=%s", city)
+def get_current(
+    city: str = Query(..., min_length=2),
+    lat: Optional[float] = Query(None),
+    lon: Optional[float] = Query(None)
+) -> WeatherCurrentResponse:
+    logger.info("GET /current city=%s lat=%s lon=%s", city, lat, lon)
     try:
         validated_city = validate_input(city)
-        payload = get_current_weather(validated_city)
+        payload = get_current_weather(validated_city, lat=lat, lon=lon)
         return WeatherCurrentResponse(**payload)
     except ValueError as exc:
         # Catch validation or configuration errors (like missing/invalid API key)
@@ -84,11 +88,15 @@ def get_current(city: str = Query(..., min_length=2)) -> WeatherCurrentResponse:
 
 
 @app.get("/forecast", response_model=ForecastResponse)
-def get_forecast(city: str = Query(..., min_length=2)) -> ForecastResponse:
-    logger.info("GET /forecast city=%s", city)
+def get_forecast(
+    city: str = Query(..., min_length=2),
+    lat: Optional[float] = Query(None),
+    lon: Optional[float] = Query(None)
+) -> ForecastResponse:
+    logger.info("GET /forecast city=%s lat=%s lon=%s", city, lat, lon)
     try:
         validated_city = validate_input(city)
-        payload = predict_next_7_days(validated_city)
+        payload = predict_next_7_days(validated_city, lat=lat, lon=lon)
         return ForecastResponse(**payload)
     except ValueError as exc:
         logger.warning("Forecast input error: %s", exc)
