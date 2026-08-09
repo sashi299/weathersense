@@ -27,16 +27,19 @@ MODELS_DIR = BASE_DIR.parent / "models"
 def generate_analytics_report() -> Dict[str, Any]:
     """Generate summary analytics from datasets and model metrics."""
     try:
-        # 1. Dataset summary
+        # 1. Dataset summary - use full historical data for summary if available
+        raw_path = DATA_DIR / "weather_history_45y.csv"
         train_path = PROCESSED_DIR / "train.csv"
-        if not train_path.exists():
-            raise FileNotFoundError("Train dataset missing")
 
-        df = pd.read_csv(train_path)
+        summary_path = raw_path if raw_path.exists() else train_path
+        if not summary_path.exists():
+            raise FileNotFoundError("Historical dataset missing")
+
+        df = pd.read_csv(summary_path)
         summary = {
             "total_records": len(df),
             "cities": df["city"].unique().tolist() if "city" in df.columns else [],
-            "date_range": [df["date"].min(), df["date"].max()],
+            "date_range": [str(df["date"].min()), str(df["date"].max())],
             "features": df.columns.tolist()
         }
 

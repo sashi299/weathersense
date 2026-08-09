@@ -11,7 +11,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DATA_PATH = Path(__file__).resolve().parents[1] / ".." / "data" / "weather_history.csv"
+DEFAULT_DATA_PATH = Path(__file__).resolve().parents[1] / ".." / "data" / "weather_history_45y.csv"
 PROCESSED_DIR = Path(__file__).resolve().parents[1] / ".." / "data" / "processed"
 
 
@@ -65,7 +65,7 @@ def clean_data(data: pd.DataFrame, date_column: str = "date") -> pd.DataFrame:
 
     numeric_columns = [
         col
-        for col in ["temperature", "humidity", "rainfall", "wind_speed"]
+        for col in ["temperature", "humidity", "rainfall", "wind_speed", "pressure"]
         if col in cleaned.columns
     ]
     for column in numeric_columns:
