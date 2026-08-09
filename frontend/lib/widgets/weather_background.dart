@@ -41,10 +41,11 @@ class _WeatherBackgroundState extends State<WeatherBackground> with TickerProvid
   void _initParticles() {
     _particles.clear();
     int count = 0;
-    if (_currentCondition.contains('Rainy') || _currentCondition.contains('Drizzle')) count = 120;
-    if (_currentCondition.contains('Thunderstorm')) count = 150;
-    if (_currentCondition.contains('Snowy')) count = 80;
-    if (_currentCondition.contains('Fog') || _currentCondition.contains('Mist') || _currentCondition.contains('Haze')) count = 15;
+    final cond = _currentCondition.toUpperCase();
+    if (cond.contains('RAIN') || cond.contains('DRIZZLE')) count = 120;
+    if (cond.contains('THUNDERSTORM')) count = 150;
+    if (cond.contains('SNOW')) count = 80;
+    if (cond.contains('FOG') || cond.contains('MIST') || cond.contains('HAZE') || cond.contains('ATMOSPHERE')) count = 15;
 
     for (int i = 0; i < count; i++) {
       _particles.add(Particle(
@@ -169,24 +170,26 @@ class _WeatherBackgroundState extends State<WeatherBackground> with TickerProvid
   }
 
   List<Color> _getAmbientColors(String condition) {
-    if (condition.contains('Sunny') || condition.contains('Clear')) {
-      return condition.contains('Night') 
+    final cond = condition.toUpperCase();
+    if (cond.contains('SUNNY') || cond.contains('CLEAR')) {
+      return cond.contains('NIGHT') 
         ? [const Color(0xFF040812), const Color(0xFF0B1220)] 
         : [const Color(0xFF1E3A5F), const Color(0xFF0B1220)];
     }
-    if (condition.contains('Rainy') || condition.contains('Thunderstorm') || condition.contains('Drizzle')) {
+    if (cond.contains('RAIN') || cond.contains('THUNDERSTORM') || cond.contains('DRIZZLE')) {
       return [const Color(0xFF0F172A), const Color(0xFF020617)];
     }
-    if (condition.contains('Cloudy') || condition.contains('Overcast') || condition.contains('Fog') || condition.contains('Mist') || condition.contains('Haze')) {
+    if (cond.contains('CLOUD') || cond.contains('OVERCAST') || cond.contains('FOG') || cond.contains('MIST') || cond.contains('HAZE') || cond.contains('ATMOSPHERE')) {
       return [const Color(0xFF1E293B), const Color(0xFF0F172A)];
     }
     return [const Color(0xFF0B1220), const Color(0xFF020617)];
   }
 
   Widget _buildAtmosphericEffect(String condition) {
-    bool isDay = !condition.contains('Night');
+    final cond = condition.toUpperCase();
+    bool isDay = !cond.contains('NIGHT');
     
-    if (condition.contains('Sunny') || condition.contains('Clear') || condition.contains('Partly Cloudy')) {
+    if (cond.contains('SUNNY') || cond.contains('CLEAR') || cond.contains('PARTLY CLOUDY') || cond.contains('MAINLY CLEAR')) {
       return Positioned(
         top: isDay ? -200 : -100,
         right: isDay ? -200 : 0,
@@ -212,7 +215,7 @@ class _WeatherBackgroundState extends State<WeatherBackground> with TickerProvid
       );
     }
     
-    if (condition.contains('Cloudy') || condition.contains('Overcast') || condition.contains('Clouds')) {
+    if (cond.contains('CLOUD') || cond.contains('OVERCAST')) {
       return AnimatedBuilder(
         animation: _controller,
         builder: (context, _) => CustomPaint(
@@ -245,8 +248,9 @@ class ParticlePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final cond = condition.toUpperCase();
     final paint = Paint()
-      ..color = condition.contains('Snowy') ? Colors.white.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.25)
+      ..color = cond.contains('SNOW') ? Colors.white.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.25)
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round;
 
@@ -255,9 +259,9 @@ class ParticlePainter extends CustomPainter {
       double xPos = p.x * size.width;
       double yPos = currentY * size.height;
 
-      if (condition.contains('Snowy')) {
+      if (cond.contains('SNOW')) {
         canvas.drawCircle(Offset(xPos, yPos), p.size, paint);
-      } else if (condition.contains('Rainy') || condition.contains('Thunderstorm') || condition.contains('Drizzle')) {
+      } else if (cond.contains('RAIN') || cond.contains('THUNDERSTORM') || cond.contains('DRIZZLE')) {
         // Rain - slanted lines
         canvas.drawLine(Offset(xPos, yPos), Offset(xPos - 2, yPos + 15), paint);
       }

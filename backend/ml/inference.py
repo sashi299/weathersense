@@ -68,6 +68,8 @@ class WeatherCurrentResponse(BaseModel):
     moon_illumination: int
     moonrise: str
     moonset: str
+    visibility: int
+    rain_1h: float
 
 _MODELS: Dict[str, Any] = {}
 _METADATA: Dict[str, Any] = {}
@@ -234,42 +236,40 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
     # Extract condition for animation mapping
     weather_info = payload.get("weather", [{}])[0]
     weather_id = weather_info.get("id", 800)
-    main_weather = weather_info.get("main", "Clear")
+    description = weather_info.get("description", "clear sky")
 
-    # Map to internal conditions strictly by OWM groups
-    # Group 2xx: Thunderstorm
+    # Map to internal conditions strictly by OWM groups as requested in point 2
     if 200 <= weather_id <= 232:
-        condition = "Thunderstorm"
-    # Group 3xx: Drizzle
+        condition = "THUNDERSTORM"
     elif 300 <= weather_id <= 321:
-        condition = "Drizzle"
-    # Group 5xx: Rain
-    elif 500 <= weather_id <= 531:
-        # Check if it's actually raining (sanity check on precipitation field)
-        rain_data = payload.get("rain", {}).get("1h", 0)
-        if rain_data > 0 or weather_id in [502, 503, 504]:
-            condition = "Rainy"
-        else:
-            # Fallback to Cloudy if ID says Rain but no rainfall data (sometimes OWM is buggy)
-            condition = "Cloudy"
-    # Group 6xx: Snow
+        condition = "DRIZZLE"
+    elif 500 <= weather_id <= 504:
+        # Special handling for heavy rain as requested
+        if weather_id == 502: condition = "HEAVY INTENSITY RAIN"
+        else: condition = "RAIN"
+    elif weather_id == 511:
+        condition = "FREEZING RAIN"
+    elif 520 <= weather_id <= 531:
+        condition = "SHOWER RAIN"
     elif 600 <= weather_id <= 622:
-        condition = "Snowy"
-    # Group 7xx: Atmosphere
+        condition = "SNOW"
     elif 701 <= weather_id <= 781:
-        if weather_id in [701, 741]: condition = "Fog"
-        else: condition = "Mist"
-    # Group 800: Clear
+        condition = "ATMOSPHERE"
     elif weather_id == 800:
         local_hour = (datetime.now(timezone.utc).hour + (timezone_offset // 3600)) % 24
-        condition = "Sunny" if 6 <= local_hour <= 18 else "Clear Night"
-    # Group 80x: Clouds
-    elif 801 <= weather_id <= 804:
-        condition = "Cloudy"
+        condition = "CLEAR" if 6 <= local_hour <= 18 else "CLEAR NIGHT"
+    elif weather_id == 801:
+        condition = "FEW CLOUDS"
+    elif weather_id == 802:
+        condition = "SCATTERED CLOUDS"
+    elif weather_id == 803:
+        condition = "BROKEN CLOUDS"
+    elif weather_id == 804:
+        condition = "OVERCAST"
     else:
-        condition = main_weather
+        condition = "UNKNOWN"
 
-    logger.info(f"Mapped weather condition: {condition}")
+    logger.info(f"Mapped weather condition: {condition} (ID: {weather_id})")
 
     # Formatting helpers
     def format_time(ts):
@@ -314,16 +314,18 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
         "temperature_c": round(payload.get("main", {}).get("temp", 0), 1),
         "condition": condition,
         "condition_id": weather_id,
-        "description": payload.get("weather", [{}])[0].get("description", "clear sky"),
+        "description": description,
         "humidity": int(payload.get("main", {}).get("humidity", 0)),
         "wind_speed": float(payload.get("wind", {}).get("speed", 0)),
-        "icon": payload.get("weather", [{}])[0].get("icon", "01d"),
+        "icon": weather_info.get("icon", "01d"),
         "cached_at": datetime.now(timezone.utc).isoformat(),
         "pressure": int(payload.get("main", {}).get("pressure", 1013)),
         "sunrise": format_time(payload.get("sys", {}).get("sunrise", 0)),
         "sunset": format_time(payload.get("sys", {}).get("sunset", 0)),
         "uv_index": uv_index,
         "air_quality": air_quality,
+        "visibility": int(payload.get("visibility", 10000)),
+        "rain_1h": float(payload.get("rain", {}).get("1h", 0.0)),
     }
 
     # 3. Fetch Astronomical Data (Moon Phase/Rise/Set) from Open-Meteo
@@ -420,16 +422,25 @@ def predict_next_7_days(city: str, lat: Optional[float] = None, lon: Optional[fl
         for i in range(len(times)):
             dt = datetime.fromisoformat(times[i])
 
-            # Map Open-Meteo WMO Codes to internal conditions
+            # Official WMO mapping as requested in prompt point 4
             wmo = codes[i]
-            condition = "Clear"
-            if wmo == 0: condition = "Sunny" if 6 <= dt.hour <= 18 else "Clear Night"
-            elif wmo in [1, 2, 3]: condition = "Partly Cloudy"
-            elif wmo in [45, 48]: condition = "Fog"
-            elif wmo in [51, 53, 55, 61, 63, 65, 80, 81, 82]: condition = "Rainy"
-            elif wmo in [71, 73, 75, 85, 86]: condition = "Snowy"
-            elif wmo in [95, 96, 99]: condition = "Thunderstorm"
-            else: condition = "Cloudy"
+            if wmo == 0:
+                condition = "CLEAR" if 6 <= dt.hour <= 18 else "CLEAR NIGHT"
+            elif wmo == 1: condition = "MAINLY CLEAR"
+            elif wmo == 2: condition = "PARTLY CLOUDY"
+            elif wmo == 3: condition = "OVERCAST"
+            elif wmo in [45, 48]: condition = "FOG"
+            elif wmo in [51, 53, 55]: condition = "DRIZZLE"
+            elif wmo in [56, 57]: condition = "FREEZING DRIZZLE"
+            elif wmo in [61, 63, 65]: condition = "RAIN"
+            elif wmo in [66, 67]: condition = "FREEZING RAIN"
+            elif wmo in [71, 73, 75]: condition = "SNOW"
+            elif wmo == 77: condition = "SNOW GRAINS"
+            elif wmo in [80, 81, 82]: condition = "SHOWER RAIN"
+            elif wmo in [85, 86]: condition = "SNOW SHOWERS"
+            elif wmo == 95: condition = "THUNDERSTORM"
+            elif wmo in [96, 99]: condition = "THUNDERSTORM WITH HAIL"
+            else: condition = "CLOUDY"
 
             forecasts.append({
                 "date": dt.strftime("%Y-%m-%d"),
@@ -461,9 +472,9 @@ def _build_fallback_weather(city: str) -> Dict[str, Any]:
         "lat": 0.0,
         "lon": 0.0,
         "temperature_c": 22.0,
-        "condition": "Cloudy",
+        "condition": "CLOUDY",
         "condition_id": 803,
-        "description": "scattered clouds",
+        "description": "conditions unavailable",
         "humidity": 60,
         "wind_speed": 4.0,
         "icon": "03d",
@@ -473,4 +484,10 @@ def _build_fallback_weather(city: str) -> Dict[str, Any]:
         "sunset": "18:00",
         "uv_index": 5.0,
         "air_quality": "Good",
+        "moon_phase": "Full Moon",
+        "moon_illumination": 100,
+        "moonrise": "--:--",
+        "moonset": "--:--",
+        "visibility": 10000,
+        "rain_1h": 0.0,
     }

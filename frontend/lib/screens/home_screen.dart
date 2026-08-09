@@ -506,10 +506,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   IconData _getConditionIcon(String condition) {
-    if (condition.contains('Rainy') || condition.contains('Drizzle')) return Icons.umbrella_rounded;
-    if (condition.contains('Thunderstorm')) return Icons.bolt_rounded;
-    if (condition.contains('Cloudy') || condition.contains('Fog') || condition.contains('Mist') || condition.contains('Haze')) return Icons.cloud_rounded;
-    if (condition.contains('Clear Night')) return Icons.nights_stay_rounded;
+    final cond = condition.toUpperCase();
+    if (cond.contains('RAIN') || cond.contains('DRIZZLE')) return Icons.umbrella_rounded;
+    if (cond.contains('THUNDERSTORM')) return Icons.bolt_rounded;
+    if (cond.contains('CLOUD') || cond.contains('OVERCAST') || cond.contains('ATMOSPHERE') || cond.contains('FOG') || cond.contains('MIST') || cond.contains('HAZE')) return Icons.cloud_rounded;
+    if (cond.contains('CLEAR NIGHT')) return Icons.nights_stay_rounded;
     return Icons.wb_sunny_rounded;
   }
 
