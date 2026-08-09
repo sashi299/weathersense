@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:weather_sense/providers/weather_provider.dart';
 import 'package:weather_sense/widgets/weather_background.dart';
@@ -10,9 +11,15 @@ class ForecastScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('7-Day Forecast'),
+        title: Column(
+          children: [
+            const Text('AI Hourly Forecast'),
+            Text('7-Day Predictive Model', style: GoogleFonts.spaceGrotesk(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
+          ],
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
       ),
       body: Consumer<WeatherProvider>(
         builder: (context, provider, _) {
