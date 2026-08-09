@@ -132,14 +132,12 @@ def get_analytics() -> dict:
 
 @app.get("/search")
 def search_cities(q: str = Query(..., min_length=2)) -> list:
-    logger.info("GET /search q=%s", q)
+    logger.info("GET /search q='%s'", q)
     try:
         api_key = get_api_key()
         if not api_key:
-            logger.error("Search failed: OPENWEATHER_API_KEY is missing")
-            return []
+            return [{"error": "Missing API Key"}]
 
-        # Use /data/2.5/find which is more reliable than /geo/1.0/direct for some regions
         url = "https://api.openweathermap.org/data/2.5/find"
         params = {"q": q, "cnt": 10, "appid": api_key, "units": "metric"}
         res = requests.get(url, params=params, timeout=5)
@@ -151,19 +149,17 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
             for item in raw_list:
                 results.append({
                     "name": item.get("name"),
-                    "state": None, # /find doesn't return state
+                    "state": None,
                     "country": item.get("sys", {}).get("country"),
                     "lat": item.get("coord", {}).get("lat"),
-                    "lon": item.get("coord", {}).get("lon")
+                    "lon": item.get("coord", {}).get("lon"),
+                    "debug_q": q
                 })
-            logger.info("Search results for %s: %d", q, len(results))
             return results
 
-        logger.error("Search API (find) returned status %d", res.status_code)
-        return []
+        return [{"error": f"OWM Status {res.status_code}", "q": q}]
     except Exception as exc:
-        logger.error("Search failed for %s: %s", q, exc)
-        return []
+        return [{"error": str(exc), "q": q}]
     except Exception as exc:
         logger.error("Search failed for %s: %s", q, exc)
         return []
