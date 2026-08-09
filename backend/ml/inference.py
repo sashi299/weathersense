@@ -260,10 +260,19 @@ def predict_next_7_days(city: str) -> Dict[str, Any]:
         # Humidity is usually inverse of temp
         predicted_humidity = round(max(20, min(100, current["humidity"] - (daily_cycle * 2))), 1)
 
-        # Rainfall prediction (simplified)
-        rainfall = 0.0
-        if predicted_humidity > 85:
-            rainfall = round(max(0, np.random.normal(1.5, 0.5)), 1)
+        # More descriptive conditions based on time and stats
+        condition = "Clear"
+        if rainfall > 0:
+            condition = "Rainy"
+        elif predicted_humidity > 85:
+            condition = "Overcast"
+        elif predicted_humidity > 65:
+            condition = "Cloudy"
+        else:
+            if 6 <= hour <= 18:
+                condition = "Sunny" if predicted_humidity < 40 else "Partly Cloudy"
+            else:
+                condition = "Clear Night"
 
         forecasts.append({
             "date": target_time.strftime("%Y-%m-%d"),
@@ -271,7 +280,7 @@ def predict_next_7_days(city: str) -> Dict[str, Any]:
             "temp": predicted_temp,
             "humidity": predicted_humidity,
             "rainfall_mm": rainfall,
-            "condition": "Rainy" if rainfall > 0 else ("Cloudy" if predicted_humidity > 70 else "Clear"),
+            "condition": condition,
             "confidence": round(0.9 - (i * 0.002), 2)
         })
 

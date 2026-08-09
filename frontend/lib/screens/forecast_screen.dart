@@ -44,74 +44,117 @@ class ForecastScreen extends StatelessWidget {
               final humidity = (day['humidity'] as num?)?.toDouble() ?? 0;
               final condition = day['condition']?.toString() ?? 'Clear';
 
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF111727),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0x11FFFFFF)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              // Show date header only when it changes
+              bool showHeader = false;
+              if (index == 0) {
+                showHeader = true;
+              } else {
+                final prevDay = items[index - 1] as Map<String, dynamic>;
+                if (prevDay['date'] != day['date']) {
+                  showHeader = true;
+                }
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (showHeader) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24, bottom: 12, left: 4),
+                      child: Row(
                         children: [
+                          const Icon(Icons.calendar_today, size: 14, color: Color(0xFF3FA9A0)),
+                          const SizedBox(width: 8),
                           Text(
-                            _formatDate(dateStr),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            timeStr,
-                            style: const TextStyle(color: Color(0xFF3FA9A0), fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(_getConditionIcon(condition), size: 16, color: Colors.grey),
-                              const SizedBox(width: 4),
-                              Text(condition, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.water_drop_outlined, size: 14, color: Color(0xFF3FA9A0)),
-                              const SizedBox(width: 4),
-                              Text('${rain.toStringAsFixed(1)}mm', style: const TextStyle(fontSize: 12)),
-                              const SizedBox(width: 12),
-                              const Icon(Icons.wb_cloudy_outlined, size: 14, color: Color(0xFFE8935A)),
-                              const SizedBox(width: 4),
-                              Text('${humidity.toInt()}%', style: const TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '${temp.toStringAsFixed(1)}${provider.tempUnit}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            _formatDate(dateStr).toUpperCase(),
+                            style: const TextStyle(
+                              color: Color(0xFF3FA9A0),
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                ),
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF111727),
+                          _getConditionColor(condition).withOpacity(0.05),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0x0AFFFFFF)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _getConditionColor(condition).withOpacity(0.03),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        )
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              timeStr,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              condition,
+                              style: TextStyle(
+                                color: _getConditionColor(condition),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        _miniStat(Icons.water_drop_outlined, '${humidity.toInt()}%'),
+                        const SizedBox(width: 16),
+                        _miniStat(Icons.air, '${rain.toStringAsFixed(1)}mm'),
+                        const SizedBox(width: 24),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0x11FFFFFF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(_getConditionIcon(condition), size: 20, color: _getConditionColor(condition)),
+                              const SizedBox(width: 10),
+                              Text(
+                                '${temp.toStringAsFixed(1)}${provider.tempUnit}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               );
             },
           );
@@ -120,12 +163,32 @@ class ForecastScreen extends StatelessWidget {
     );
   }
 
+  Widget _miniStat(IconData icon, String value) {
+    return Column(
+      children: [
+        Icon(icon, size: 14, color: Colors.grey),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+      ],
+    );
+  }
+
+  Color _getConditionColor(String condition) {
+    if (condition.contains('Sunny') || condition.contains('Clear')) return const Color(0xFFE8935A);
+    if (condition.contains('Rainy')) return const Color(0xFF4FA8FF);
+    if (condition.contains('Cloudy') || condition.contains('Overcast')) return const Color(0xFF3FA9A0);
+    return Colors.white70;
+  }
+
   IconData _getConditionIcon(String condition) {
-    switch (condition) {
-      case 'Rainy': return Icons.umbrella_outlined;
-      case 'Cloudy': return Icons.wb_cloudy_outlined;
-      default: return Icons.wb_sunny_outlined;
-    }
+    if (condition.contains('Sunny')) return Icons.wb_sunny_rounded;
+    if (condition.contains('Clear Night')) return Icons.nights_stay_rounded;
+    if (condition.contains('Clear')) return Icons.wb_sunny_outlined;
+    if (condition.contains('Partly Cloudy')) return Icons.wb_cloudy_outlined;
+    if (condition.contains('Cloudy')) return Icons.cloud_outlined;
+    if (condition.contains('Overcast')) return Icons.cloud_rounded;
+    if (condition.contains('Rainy')) return Icons.umbrella_rounded;
+    return Icons.wb_cloudy_rounded;
   }
 
   String _formatDate(String dateStr) {
