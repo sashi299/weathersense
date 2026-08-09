@@ -62,12 +62,16 @@ class WeatherCurrentResponse(BaseModel):
     pressure: int
     sunrise: str
     sunset: str
+    sunrise_iso: str
+    sunset_iso: str
     uv_index: float
     air_quality: str
     moon_phase: str
     moon_illumination: int
     moonrise: str
     moonset: str
+    moonrise_iso: str
+    moonset_iso: str
     visibility: int
     rain_1h: float
 
@@ -276,6 +280,10 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
         dt = datetime.fromtimestamp(ts, timezone.utc) + timedelta(seconds=timezone_offset)
         return dt.strftime("%H:%M")
 
+    def format_iso(ts):
+        dt = datetime.fromtimestamp(ts, timezone.utc) + timedelta(seconds=timezone_offset)
+        return dt.isoformat()
+
     # Fetch Air Quality
     air_quality = "Moderate"
     if lat is not None and lon is not None:
@@ -322,6 +330,8 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
         "pressure": int(payload.get("main", {}).get("pressure", 1013)),
         "sunrise": format_time(payload.get("sys", {}).get("sunrise", 0)),
         "sunset": format_time(payload.get("sys", {}).get("sunset", 0)),
+        "sunrise_iso": format_iso(payload.get("sys", {}).get("sunrise", 0)),
+        "sunset_iso": format_iso(payload.get("sys", {}).get("sunset", 0)),
         "uv_index": uv_index,
         "air_quality": air_quality,
         "visibility": int(payload.get("visibility", 10000)),
@@ -329,6 +339,11 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
     }
 
     # 3. Fetch Astronomical Data (Moon Phase/Rise/Set) from Open-Meteo
+    current_payload["moonrise"] = "--:--"
+    current_payload["moonset"] = "--:--"
+    current_payload["moonrise_iso"] = ""
+    current_payload["moonset_iso"] = ""
+
     try:
         astro_url = "https://api.open-meteo.com/v1/astronomy"
         astro_params = {
@@ -340,9 +355,16 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
         astro_res = requests.get(astro_url, params=astro_params, timeout=5)
         if astro_res.status_code == 200:
             astro_data = astro_res.json().get("daily", {})
-            # We take index 0 (today)
-            current_payload["moonrise"] = (astro_data.get("moonrise", ["--:--"])[0] or "").split("T")[-1]
-            current_payload["moonset"] = (astro_data.get("moonset", ["--:--"])[0] or "").split("T")[-1]
+            # Today's moon events
+            m_rise = astro_data.get("moonrise", [""])[0]
+            m_set = astro_data.get("moonset", [""])[0]
+
+            if m_rise:
+                current_payload["moonrise_iso"] = m_rise
+                current_payload["moonrise"] = m_rise.split("T")[-1]
+            if m_set:
+                current_payload["moonset_iso"] = m_set
+                current_payload["moonset"] = m_set.split("T")[-1]
     except Exception as e:
         logger.error(f"Astronomy fetch failed: {e}")
 
