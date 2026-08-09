@@ -1,0 +1,94 @@
+{
+    "version": "india_v1",
+    "training_period": "1981-2011",
+    "spatial_resolution": "5.0 degrees",
+    "targets": {
+        "temperature": {
+            "model": "XGBoost",
+            "filename": "temperature_india.joblib",
+            "metrics": {
+                "rmse": 3.4017369083181723,
+                "mae": 1.0605118491095533,
+                "r2": 0.9306521393422577
+            },
+            "features": [
+                "latitude",
+                "longitude",
+                "wind_speed",
+                "pressure",
+                "month",
+                "day_of_year",
+                "sin_day",
+                "cos_day",
+                "temp_lag_1",
+                "temp_lag_3",
+                "temp_lag_7",
+                "hum_lag_1",
+                "rain_lag_1",
+                "temp_3d_avg",
+                "temp_7d_avg",
+                "hum_7d_avg",
+                "rain_7d_avg",
+                "temp_diff"
+            ]
+        },
+        "humidity": {
+            "model": "XGBoost",
+            "filename": "humidity_india.joblib",
+            "metrics": {
+                "rmse": 4.733717163880757,
+                "mae": 3.2576979618052917,
+                "r2": 0.9538122981775068
+            },
+            "features": [
+                "latitude",
+                "longitude",
+                "wind_speed",
+                "pressure",
+                "month",
+                "day_of_year",
+                "sin_day",
+                "cos_day",
+                "temp_lag_1",
+                "temp_lag_3",
+                "temp_lag_7",
+                "hum_lag_1",
+                "rain_lag_1",
+                "temp_3d_avg",
+                "temp_7d_avg",
+                "hum_7d_avg",
+                "rain_7d_avg",
+                "temp_diff"
+            ]
+        },
+        "rainfall": {
+            "model": "XGBoost",
+            "filename": "rainfall_india.joblib",
+            "metrics": {
+                "rmse": 5.259549702458222,
+                "mae": 1.8290890579010994,
+                "r2": 0.5615987972063667
+            },
+            "features": [
+                "latitude",
+                "longitude",
+                "wind_speed",
+                "pressure",
+                "month",
+                "day_of_year",
+                "sin_day",
+                "cos_day",
+                "temp_lag_1",
+                "temp_lag_3",
+                "temp_lag_7",
+                "hum_lag_1",
+                "rain_lag_1",
+                "temp_3d_avg",
+                "temp_7d_avg",
+                "hum_7d_avg",
+                "rain_7d_avg",
+                "temp_diff"
+            ]
+        }
+    }
+}
