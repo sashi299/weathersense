@@ -93,18 +93,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return AnimatedContainer(
       duration: const Duration(milliseconds: 600),
       margin: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(35),
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF6B5B95).withOpacity(0.8),
-            const Color(0xFFE8935A).withOpacity(0.7),
-            const Color(0xFF0B1220).withOpacity(0.6)
+            const Color(0xFF6B5B95).withOpacity(0.9),
+            const Color(0xFFE8935A).withOpacity(0.8),
+            const Color(0xFF0B1220).withOpacity(0.4)
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,59 +122,105 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(city, style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text(city, style: GoogleFonts.spaceGrotesk(fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+                    const SizedBox(height: 4),
                     Text(
                       _getFormattedDate(),
-                      style: const TextStyle(color: Color(0x90F2F0EA), fontSize: 13),
+                      style: const TextStyle(color: Color(0xB0F2F0EA), fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
               ),
-              IconButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen())), icon: const Icon(Icons.search_rounded)),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
+                  icon: const Icon(Icons.search_rounded, color: Colors.white),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(condition, style: const TextStyle(color: Color(0xFFF2F0EA), fontSize: 16)),
-          const SizedBox(height: 12),
+          const SizedBox(height: 32),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(temperature != null ? '${temperature.toStringAsFixed(0)}${provider.tempUnit}' : '--${provider.tempUnit}', style: GoogleFonts.spaceGrotesk(fontSize: 64, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 10),
-              const Text('live readout', style: TextStyle(color: Color(0x70F2F0EA))),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(temperature != null ? '${temperature.toStringAsFixed(0)}${provider.tempUnit}' : '--${provider.tempUnit}', 
+                    style: GoogleFonts.spaceGrotesk(fontSize: 82, fontWeight: FontWeight.bold, height: 1.0)),
+                  Text(condition, style: const TextStyle(color: Color(0xFFF2F0EA), fontSize: 20, fontWeight: FontWeight.w300, letterSpacing: 1.0)),
+                ],
+              ),
+              // Large dynamic icon
+              Icon(_getLargeIcon(condition), size: 100, color: Colors.white.withOpacity(0.9)),
             ],
           ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 8,
-            children: [
-              _chip('Humidity', '${weather?['humidity'] ?? '--'}%'),
-              _chip('Wind', '${weather?['wind_speed'] ?? '--'} m/s'),
-              _chip('Pressure', '${weather?['pressure'] ?? '--'} hPa'),
-            ],
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(25),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _heroStat(Icons.water_drop_outlined, '${weather?['humidity'] ?? '--'}%', 'Humidity'),
+                _heroStat(Icons.air, '${weather?['wind_speed'] ?? '--'}m/s', 'Wind'),
+                _heroStat(Icons.speed, '${weather?['pressure'] ?? '--'}', 'hPa'),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _heroStat(IconData icon, String value, String label) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF3FA9A0)),
+        const SizedBox(height: 8),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(label, style: const TextStyle(fontSize: 10, color: Color(0x70F2F0EA))),
+      ],
+    );
+  }
+
+  IconData _getLargeIcon(String condition) {
+    if (condition.contains('Rainy')) return Icons.umbrella_rounded;
+    if (condition.contains('Thunderstorm')) return Icons.bolt_rounded;
+    if (condition.contains('Cloudy') || condition.contains('Overcast')) return Icons.cloud_rounded;
+    if (condition.contains('Clear Night')) return Icons.nights_stay_rounded;
+    return Icons.wb_sunny_rounded;
+  }
+
   Widget _buildQuickStats(Map<String, dynamic>? weather) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Live instrument panel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text('INSTRUMENT PANEL', 
+            style: GoogleFonts.spaceGrotesk(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 2, color: const Color(0xFF3FA9A0))),
+        ),
+        const SizedBox(height: 16),
         GridView.count(
           crossAxisCount: 2,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 1.4,
           children: [
-            _statCard('UV Index', '${weather?['uv_index'] ?? '--'}', Icons.wb_sunny_outlined),
-            _statCard('Air Quality', '${weather?['air_quality'] ?? '--'}', Icons.air_outlined),
-            _statCard('Sunrise', weather?['sunrise'] ?? '--:--', Icons.wb_twilight),
-            _statCard('Sunset', weather?['sunset'] ?? '--:--', Icons.nights_stay_outlined),
+            _statCard('UV INDEX', '${weather?['uv_index'] ?? '--'}', Icons.wb_sunny_outlined, const Color(0xFFFFB74D)),
+            _statCard('AIR QUALITY', '${weather?['air_quality'] ?? '--'}', Icons.air_outlined, const Color(0xFF81C784)),
+            _statCard('SUNRISE', weather?['sunrise'] ?? '--:--', Icons.wb_twilight, const Color(0xFF64B5F6)),
+            _statCard('SUNSET', weather?['sunset'] ?? '--:--', Icons.nights_stay_outlined, const Color(0xFF9575CD)),
           ],
         ),
       ],
@@ -177,11 +230,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildActionRow(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _actionButton('Forecast', Icons.timeline, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ForecastScreen())))),
-        const SizedBox(width: 10),
-        Expanded(child: _actionButton('Analytics', Icons.analytics_outlined, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnalyticsScreen())))),
-        const SizedBox(width: 10),
-        Expanded(child: _actionButton('Settings', Icons.tune, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())))),
+        Expanded(child: _actionButton('Forecast', Icons.timeline_rounded, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ForecastScreen())))),
+        const SizedBox(width: 12),
+        Expanded(child: _actionButton('Analytics', Icons.auto_graph_rounded, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnalyticsScreen())))),
+        const SizedBox(width: 12),
+        Expanded(child: _actionButton('Settings', Icons.settings_input_component_rounded, () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())))),
       ],
     );
   }
@@ -237,41 +290,51 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _statCard(String label, String value, IconData icon) {
+  Widget _statCard(String label, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF111727).withOpacity(0.5),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x0AFFFFFF)),
+        color: const Color(0xFF111727).withOpacity(0.4),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF3FA9A0)),
-          const SizedBox(height: 10),
-          Text(label, style: const TextStyle(fontSize: 12, color: Color(0x70F2F0EA))),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          Icon(icon, size: 22, color: color),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey, letterSpacing: 1)),
+              const SizedBox(height: 2),
+              Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _chip(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(color: const Color(0x22FFFFFF), borderRadius: BorderRadius.circular(999)),
-      child: Text('$label $value', style: const TextStyle(fontSize: 12)),
-    );
-  }
-
   Widget _actionButton(String label, IconData icon, VoidCallback onPressed) {
-    return TextButton.icon(
-      style: TextButton.styleFrom(backgroundColor: const Color(0x11FFFFFF), padding: const EdgeInsets.symmetric(vertical: 14)),
-      onPressed: onPressed,
-      icon: Icon(icon, color: const Color(0xFF3FA9A0)),
-      label: Text(label, style: const TextStyle(color: Color(0xFFF2F0EA))),
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111727).withOpacity(0.6),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: const Color(0xFF3FA9A0), size: 24),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
     );
   }
 
