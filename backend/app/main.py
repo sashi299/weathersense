@@ -138,7 +138,8 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
         if not api_key:
             return [{"error": "Missing API Key"}]
 
-        url = "https://api.openweathermap.org/data/2.5/find"
+        # Fallback to http just in case https is restricted for geocoding in this environment
+        url = "http://api.openweathermap.org/data/2.5/find"
         params = {"q": q, "cnt": 10, "appid": api_key, "units": "metric"}
         res = requests.get(url, params=params, timeout=5)
 
