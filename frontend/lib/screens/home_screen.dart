@@ -7,6 +7,7 @@ import 'package:weather_sense/screens/analytics_screen.dart';
 import 'package:weather_sense/screens/forecast_screen.dart';
 import 'package:weather_sense/screens/search_screen.dart';
 import 'package:weather_sense/screens/settings_screen.dart';
+import 'package:weather_sense/widgets/weather_background.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,30 +44,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         builder: (context, provider, _) {
           final weather = provider.currentWeather;
           final forecast = provider.forecast;
-          return RefreshIndicator(
-            onRefresh: () => provider.loadWeather(provider.currentWeather?['city']?.toString() ?? provider.lastCity),
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _buildHero(weather, provider)),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      _buildQuickStats(weather),
-                      const SizedBox(height: 18),
-                      _buildActionRow(context),
-                      const SizedBox(height: 18),
-                      if (provider.isLoading) ...[
-                        _buildSkeleton(),
-                      ] else if (provider.errorMessage.isNotEmpty) ...[
-                        _buildErrorState(provider.errorMessage),
-                      ] else ...[
-                        _buildMiniForecast(forecast),
-                      ],
-                    ]),
+          final condition = weather?['condition']?.toString() ?? 'Clear';
+
+          return WeatherBackground(
+            condition: condition,
+            child: RefreshIndicator(
+              onRefresh: () => provider.loadWeather(provider.currentWeather?['city']?.toString() ?? provider.lastCity),
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(child: _buildHero(weather, provider)),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        _buildQuickStats(weather),
+                        const SizedBox(height: 18),
+                        _buildActionRow(context),
+                        const SizedBox(height: 18),
+                        if (provider.isLoading) ...[
+                          _buildSkeleton(),
+                        ] else if (provider.errorMessage.isNotEmpty) ...[
+                          _buildErrorState(provider.errorMessage),
+                        ] else ...[
+                          _buildMiniForecast(forecast),
+                        ],
+                      ]),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -90,8 +96,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6B5B95), Color(0xFFE8935A), Color(0xFF0B1220)],
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF6B5B95).withOpacity(0.8),
+            const Color(0xFFE8935A).withOpacity(0.7),
+            const Color(0xFF0B1220).withOpacity(0.6)
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -230,7 +240,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _statCard(String label, String value, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: const Color(0x11FFFFFF), borderRadius: BorderRadius.circular(18)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111727).withOpacity(0.5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x0AFFFFFF)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

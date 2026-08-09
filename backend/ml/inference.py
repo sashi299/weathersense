@@ -177,6 +177,22 @@ def get_current_weather(city: str) -> Dict[str, Any]:
 
     payload = response.json()
 
+    # Extract condition for animation mapping
+    main_weather = payload.get("weather", [{}])[0].get("main", "Clear")
+    weather_id = payload.get("weather", [{}])[0].get("id", 800)
+
+    # Map to internal conditions
+    if 200 <= weather_id <= 232:
+        condition = "Thunderstorm"
+    elif 300 <= weather_id <= 531:
+        condition = "Rainy"
+    elif 600 <= weather_id <= 622:
+        condition = "Snowy"
+    elif weather_id == 800:
+        condition = "Sunny" if 6 <= datetime.now(timezone.utc).hour + (timezone_offset // 3600) <= 18 else "Clear Night"
+    else:
+        condition = main_weather
+
     # Extract coordinates for additional data
     coord = payload.get("coord", {})
     lat, lon = coord.get("lat"), coord.get("lon")
@@ -221,7 +237,7 @@ def get_current_weather(city: str) -> Dict[str, Any]:
         "state": state,
         "country": country,
         "temperature_c": round(payload.get("main", {}).get("temp", 0), 1),
-        "condition": payload.get("weather", [{}])[0].get("main", "Clear"),
+        "condition": condition,
         "description": payload.get("weather", [{}])[0].get("description", "clear sky"),
         "humidity": int(payload.get("main", {}).get("humidity", 0)),
         "wind_speed": float(payload.get("wind", {}).get("speed", 0)),
