@@ -140,6 +140,7 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
             logger.error("Search failed: API Key missing")
             return []
 
+        import requests
         # Use /data/2.5/find which is reliable and consistent with other endpoints
         url = "https://api.openweathermap.org/data/2.5/find"
         params = {"q": q, "cnt": 10, "appid": api_key, "units": "metric"}
