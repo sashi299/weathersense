@@ -13,7 +13,7 @@ class WeatherProvider extends ChangeNotifier {
   bool isCelsius = true;
   String lastCity = 'London';
 
-  Future<void> loadWeather(String city) async {
+  Future<void> loadWeather(String city, {double? lat, double? lon}) async {
     final normalizedCity = city.trim();
     if (normalizedCity.isEmpty) {
       errorMessage = 'Enter a city name';
@@ -26,15 +26,18 @@ class WeatherProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final current = await _apiService.getCurrentWeather(normalizedCity);
-      final forecastData = await _apiService.getForecast(normalizedCity);
+      final current = await _apiService.getCurrentWeather(normalizedCity, lat: lat, lon: lon);
+      final forecastData = await _apiService.getForecast(normalizedCity, lat: lat, lon: lon);
       final analyticsData = await _apiService.getAnalytics();
       currentWeather = current;
       forecast = forecastData;
       analytics = analyticsData;
-      lastCity = normalizedCity;
-      await _saveLastCity(normalizedCity);
-      await _saveHistory(normalizedCity);
+      
+      // Update lastCity to canonical name from server if available
+      final canonicalName = current['city'] ?? normalizedCity;
+      lastCity = canonicalName;
+      await _saveLastCity(canonicalName);
+      await _saveHistory(canonicalName);
     } catch (e) {
       errorMessage = e.toString();
     } finally {

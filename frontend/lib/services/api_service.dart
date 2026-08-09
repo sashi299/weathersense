@@ -11,15 +11,25 @@ class ApiService {
     defaultValue: 'https://weathersense-backend-production.up.railway.app',
   );
 
-  Future<Map<String, dynamic>> getCurrentWeather(String city) async {
+  Future<Map<String, dynamic>> getCurrentWeather(String city, {double? lat, double? lon}) async {
     final encodedCity = Uri.encodeQueryComponent(city);
+    String url = '$baseUrl/current?city=$encodedCity';
+    if (lat != null && lon != null) {
+      url += '&lat=$lat&lon=$lon';
+    }
+    
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/current?city=$encodedCity'))
+          .get(Uri.parse(url))
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
-        throw Exception('Server error: ${response.statusCode}');
+        String msg = 'Weather service error (${response.statusCode})';
+        try {
+          final errBody = json.decode(response.body);
+          if (errBody['detail'] != null) msg = errBody['detail'];
+        } catch (_) {}
+        throw Exception(msg);
       }
 
       final decoded = json.decode(response.body);
@@ -40,15 +50,25 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> getForecast(String city) async {
+  Future<Map<String, dynamic>> getForecast(String city, {double? lat, double? lon}) async {
     final encodedCity = Uri.encodeQueryComponent(city);
+    String url = '$baseUrl/forecast?city=$encodedCity';
+    if (lat != null && lon != null) {
+      url += '&lat=$lat&lon=$lon';
+    }
+
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/forecast?city=$encodedCity'))
+          .get(Uri.parse(url))
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
-        throw Exception('Unable to load forecast: ${response.statusCode}');
+        String msg = 'Forecast unavailable (${response.statusCode})';
+        try {
+          final errBody = json.decode(response.body);
+          if (errBody['detail'] != null) msg = errBody['detail'];
+        } catch (_) {}
+        throw Exception(msg);
       }
 
       final decoded = json.decode(response.body);
