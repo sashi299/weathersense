@@ -22,9 +22,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
-    Future.microtask(() {
+    Future.microtask(() async {
       if (!mounted) return;
-      context.read<WeatherProvider>().loadWeather('London');
+      final provider = context.read<WeatherProvider>();
+      await provider.loadSettings();
+      await provider.loadWeather(provider.lastCity);
     });
   }
 
@@ -42,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           final weather = provider.currentWeather;
           final forecast = provider.forecast;
           return RefreshIndicator(
-            onRefresh: () => provider.loadWeather(provider.currentWeather?['city']?.toString() ?? 'London'),
+            onRefresh: () => provider.loadWeather(provider.currentWeather?['city']?.toString() ?? provider.lastCity),
             child: CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(child: _buildHero(weather, provider)),
@@ -99,7 +101,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         children: [
           Row(
             children: [
-              Expanded(child: Text(city, style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.bold))),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(city, style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text(
+                      _getFormattedDate(),
+                      style: const TextStyle(color: Color(0x90F2F0EA), fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
               IconButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen())), icon: const Icon(Icons.search_rounded)),
             ],
           ),
@@ -246,5 +259,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       icon: Icon(icon, color: const Color(0xFF3FA9A0)),
       label: Text(label, style: const TextStyle(color: Color(0xFFF2F0EA))),
     );
+  }
+
+  String _getFormattedDate() {
+    final now = DateTime.now();
+    final days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${days[now.weekday % 7]}, ${now.day} ${months[now.month - 1]}';
   }
 }
