@@ -1,6 +1,7 @@
 import logging
 import os
 import traceback
+import requests
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -136,10 +137,11 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
     try:
         api_key = get_api_key()
         if not api_key:
-            return [{"error": "Missing API Key"}]
+            logger.error("Search failed: API Key missing")
+            return []
 
-        # Fallback to http just in case https is restricted for geocoding in this environment
-        url = "http://api.openweathermap.org/data/2.5/find"
+        # Use /data/2.5/find which is reliable and consistent with other endpoints
+        url = "https://api.openweathermap.org/data/2.5/find"
         params = {"q": q, "cnt": 10, "appid": api_key, "units": "metric"}
         res = requests.get(url, params=params, timeout=5)
 
@@ -153,14 +155,16 @@ def search_cities(q: str = Query(..., min_length=2)) -> list:
                     "state": None,
                     "country": item.get("sys", {}).get("country"),
                     "lat": item.get("coord", {}).get("lat"),
-                    "lon": item.get("coord", {}).get("lon"),
-                    "debug_q": q
+                    "lon": item.get("coord", {}).get("lon")
                 })
+            logger.info("Search results for %s: %d", q, len(results))
             return results
 
-        return [{"error": f"OWM Status {res.status_code}", "q": q}]
+        logger.error("Search API returned status %d", res.status_code)
+        return []
     except Exception as exc:
-        return [{"error": str(exc), "q": q}]
+        logger.error("Search failed: %s", exc)
+        return []
     except Exception as exc:
         logger.error("Search failed for %s: %s", q, exc)
         return []
