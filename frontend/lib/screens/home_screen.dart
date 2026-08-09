@@ -265,6 +265,70 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildSolarLunarPanel(Map<String, dynamic>? weather) {
+    if (weather == null) return const SizedBox.shrink();
+
+    final now = DateTime.now();
+    
+    // Parse Solar Events
+    DateTime? sunrise;
+    DateTime? sunset;
+    try {
+      sunrise = DateTime.parse(weather['sunrise_iso']).toLocal();
+      sunset = DateTime.parse(weather['sunset_iso']).toLocal();
+    } catch (_) {}
+
+    // Parse Lunar Events
+    DateTime? moonrise;
+    DateTime? moonset;
+    try {
+      if (weather['moonrise_iso'] != "") moonrise = DateTime.parse(weather['moonrise_iso']).toLocal();
+      if (weather['moonset_iso'] != "") moonset = DateTime.parse(weather['moonset_iso']).toLocal();
+    } catch (_) {}
+
+    // Determine Active Phase
+    bool isSolar = false;
+    double progress = 0.0;
+    String title = "Solar Trajectory";
+    String startLabel = "Sunrise";
+    String endLabel = "Sunset";
+    String startTime = weather['sunrise'] ?? '--:--';
+    String endTime = weather['sunset'] ?? '--:--';
+    IconData startIcon = Icons.wb_twilight_rounded;
+    IconData endIcon = Icons.nights_stay_rounded;
+    Color accentColor = const Color(0xFFE8935A);
+
+    if (sunrise != null && sunset != null && now.isAfter(sunrise) && now.isBefore(sunset)) {
+      isSolar = true;
+      final total = sunset.difference(sunrise).inSeconds;
+      final elapsed = now.difference(sunrise).inSeconds;
+      progress = (elapsed / total).clamp(0.0, 1.0);
+    } else {
+      // Night Phase - Try Lunar
+      title = "Lunar Trajectory";
+      startLabel = "Moonrise";
+      endLabel = "Moonset";
+      startTime = weather['moonrise'] ?? '--:--';
+      endTime = weather['moonset'] ?? '--:--';
+      startIcon = Icons.vertical_align_top_rounded;
+      endIcon = Icons.vertical_align_bottom_rounded;
+      accentColor = const Color(0xFF94A3B8);
+
+      if (moonrise != null && moonset != null) {
+        // Handle midnight crossing
+        DateTime effectiveSet = moonset;
+        if (moonset.isBefore(moonrise)) effectiveSet = moonset.add(const Duration(days: 1));
+        
+        if (now.isAfter(moonrise) && now.isBefore(effectiveSet)) {
+          final total = effectiveSet.difference(moonrise).inSeconds;
+          final elapsed = now.difference(moonrise).inSeconds;
+          progress = (elapsed / total).clamp(0.0, 1.0);
+        } else {
+          // If not in moon interval, but it's night, show arc with progress 0 or 1
+          progress = now.isAfter(sunset ?? now) ? 1.0 : 0.0;
+        }
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -272,66 +336,48 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           children: [
             _sectionHeader('SOLAR & LUNAR'),
             const SizedBox(width: 8),
-            const Icon(Icons.wb_twilight_rounded, size: 14, color: Color(0xFF3FA9A0)),
+            Icon(isSolar ? Icons.wb_sunny_rounded : Icons.dark_mode_rounded, size: 14, color: const Color(0xFF3FA9A0)),
           ],
         ),
         const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: const Color(0xFF111727).withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          ),
-          child: Column(
-            children: [
-              _buildSolarTimeline(weather),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Divider(color: Colors.white10),
-              ),
-              _buildLunarCycle(weather),
-            ],
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 1000),
+          child: Container(
+            key: ValueKey(isSolar),
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111727).withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              children: [
+                _buildCelestialTrajectory(title, isSolar, progress, startTime, endTime, startIcon, endIcon, accentColor),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Divider(color: Colors.white10),
+                ),
+                _buildMoonPhaseInfo(weather),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSolarTimeline(Map<String, dynamic>? weather) {
-    final sunrise = weather?['sunrise'] ?? '06:00';
-    final sunset = weather?['sunset'] ?? '18:00';
-    
-    // Parse times for position calculation
-    double progress = 0.0;
-    try {
-      final now = DateTime.now();
-      final sunriseParts = sunrise.split(':');
-      final sunsetParts = sunset.split(':');
-      
-      final sr = DateTime(now.year, now.month, now.day, int.parse(sunriseParts[0]), int.parse(sunriseParts[1]));
-      final ss = DateTime(now.year, now.month, now.day, int.parse(sunsetParts[0]), int.parse(sunsetParts[1]));
-      
-      if (now.isBefore(sr)) {
-        progress = 0.0;
-      } else if (now.isAfter(ss)) {
-        progress = 1.0;
-      } else {
-        final totalDaylight = ss.difference(sr).inMinutes;
-        final elapsed = now.difference(sr).inMinutes;
-        progress = (elapsed / totalDaylight).clamp(0.0, 1.0);
-      }
-    } catch (_) {}
-
+  Widget _buildCelestialTrajectory(String title, bool isSolar, double progress, String start, String end, IconData sIcon, IconData eIcon, Color color) {
     return Column(
       children: [
+        Text(title.toUpperCase(), style: GoogleFonts.spaceGrotesk(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.grey)),
+        const SizedBox(height: 24),
         SizedBox(
           height: 120,
           child: CustomPaint(
-            painter: SolarArcPainter(
+            painter: CelestialArcPainter(
               progress: progress,
-              sunrise: sunrise,
-              sunset: sunset,
+              isSolar: isSolar,
+              accentColor: color,
             ),
             size: Size.infinite,
           ),
@@ -340,35 +386,29 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _timePoint('Sunrise', sunrise, Icons.wb_twilight_rounded, const Color(0xFFE8935A)),
-            _timePoint('Sunset', sunset, Icons.nights_stay_rounded, const Color(0xFF4B427B)),
+            _timeTile(sIcon, start, color),
+            _timeTile(eIcon, end, isSolar ? const Color(0xFF4B427B) : const Color(0xFF334155)),
           ],
         ),
       ],
     );
   }
 
-  Widget _timePoint(String label, String time, IconData icon, Color color) {
+  Widget _timeTile(IconData icon, String time, Color color) {
     return Row(
       children: [
         Icon(icon, size: 16, color: color),
         const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label.toUpperCase(), style: const TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.w900)),
-            Text(time, style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-          ],
-        ),
+        Text(time, style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
       ],
     );
   }
 
-  Widget _buildLunarCycle(Map<String, dynamic>? weather) {
-    final phase = weather?['moon_phase'] ?? 'Unknown';
-    final ill = weather?['moon_illumination'] ?? '--';
-    final rise = weather?['moonrise'] ?? '--:--';
-    final set = weather?['moonset'] ?? '--:--';
+  Widget _buildMoonPhaseInfo(Map<String, dynamic> weather) {
+    final phase = weather['moon_phase'] ?? 'Unknown';
+    final ill = weather['moon_illumination'] ?? '--';
+    final rise = weather['moonrise'] ?? '--:--';
+    final set = weather['moonset'] ?? '--:--';
 
     return Column(
       children: [
@@ -380,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           child: Row(
             children: [
-              _getMoonPhaseVisual(phase),
+              _getMoonVisual(phase),
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
@@ -397,12 +437,53 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _moonTimeTile('MOONRISE', rise, Icons.vertical_align_top_rounded)),
+            Expanded(child: _miniMoonTile('MOONRISE', rise, Icons.vertical_align_top_rounded)),
             const SizedBox(width: 12),
-            Expanded(child: _moonTimeTile('MOONSET', set, Icons.vertical_align_bottom_rounded)),
+            Expanded(child: _miniMoonTile('MOONSET', set, Icons.vertical_align_bottom_rounded)),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _miniMoonTile(String label, String time, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF94A3B8)),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 8, color: Colors.grey, fontWeight: FontWeight.w900)),
+              Text(time, style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _getMoonVisual(String phase) {
+    IconData icon = Icons.brightness_3_rounded;
+    if (phase.contains('Full')) icon = Icons.brightness_1_rounded;
+    if (phase.contains('New')) icon = Icons.radio_button_unchecked_rounded;
+    
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF94A3B8).withValues(alpha: 0.15), blurRadius: 15, spreadRadius: 2)
+        ],
+      ),
+      child: Icon(icon, size: 28, color: Colors.white.withValues(alpha: 0.8)),
     );
   }
 
@@ -522,35 +603,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
-class SolarArcPainter extends CustomPainter {
+class CelestialArcPainter extends CustomPainter {
   final double progress;
-  final String sunrise;
-  final String sunset;
+  final bool isSolar;
+  final Color accentColor;
 
-  SolarArcPainter({required this.progress, required this.sunrise, required this.sunset});
+  CelestialArcPainter({required this.progress, required this.isSolar, required this.accentColor});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height);
     final radius = size.width * 0.45;
     
-    // 1. Draw the Arc Path
+    // 1. Background Arc
     final arcPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.1)
+      ..color = Colors.white.withValues(alpha: 0.05)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-
-    final dashPath = Path();
-    for (double i = pi; i <= 2 * pi; i += 0.1) {
-      dashPath.addArc(Rect.fromCircle(center: center, radius: radius), i, 0.05);
-    }
+      ..strokeWidth = 2.0;
     canvas.drawArc(Rect.fromCircle(center: center, radius: radius), pi, pi, false, arcPaint);
 
-    // 2. Draw Progress Arc
+    // 2. Active Progress Arc
     final progressPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFFE8935A), Color(0xFF4B427B)],
+      ..shader = LinearGradient(
+        colors: isSolar 
+          ? [const Color(0xFFE8935A), const Color(0xFF4B427B)]
+          : [const Color(0xFF94A3B8), const Color(0xFF1E293B)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0
@@ -558,24 +635,32 @@ class SolarArcPainter extends CustomPainter {
     
     canvas.drawArc(Rect.fromCircle(center: center, radius: radius), pi, pi * progress, false, progressPaint);
 
-    // 3. Draw the Sun Marker
+    // 3. Dynamic Marker (Sun or Moon)
     final angle = pi + (pi * progress);
-    final sunX = center.dx + radius * cos(angle);
-    final sunY = center.dy + radius * sin(angle);
-    final sunPos = Offset(sunX, sunY);
+    final posX = center.dx + radius * cos(angle);
+    final posY = center.dy + radius * sin(angle);
+    final pos = Offset(posX, posY);
 
-    // Sun Glow
-    final sunGlowPaint = Paint()
-      ..color = const Color(0xFFE8935A).withValues(alpha: 0.3)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
-    canvas.drawCircle(sunPos, 12, sunGlowPaint);
+    // Glow Effect
+    final glowPaint = Paint()
+      ..color = accentColor.withValues(alpha: 0.2)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    canvas.drawCircle(pos, 15, glowPaint);
 
-    final sunPaint = Paint()..color = Colors.white;
-    canvas.drawCircle(sunPos, 5, sunPaint);
+    // Marker Body
+    final markerPaint = Paint()..color = Colors.white;
+    canvas.drawCircle(pos, 6, markerPaint);
+
+    if (!isSolar) {
+      // Small crater effect for moon marker
+      final craterPaint = Paint()..color = Colors.black.withValues(alpha: 0.1);
+      canvas.drawCircle(Offset(posX - 2, posY - 1), 1.5, craterPaint);
+      canvas.drawCircle(Offset(posX + 1, posY + 2), 1, craterPaint);
+    }
     
     // 4. Horizon line
     final horizonPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.05)
+      ..color = Colors.white.withValues(alpha: 0.03)
       ..strokeWidth = 1.0;
     canvas.drawLine(Offset(0, size.height), Offset(size.width, size.height), horizonPaint);
   }
