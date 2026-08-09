@@ -117,9 +117,24 @@ class ApiService {
       if (response.statusCode == 200) {
         return json.decode(response.body) as List<dynamic>;
       }
-      return [];
+      throw Exception('Search failed: ${response.statusCode}');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> reverseGeocode(double lat, double lon) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/reverse?lat=$lat&lon=$lon'))
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      }
+      return {};
     } catch (_) {
-      return [];
+      return {};
     }
   }
 }

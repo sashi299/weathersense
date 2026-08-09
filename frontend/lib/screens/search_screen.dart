@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,8 +22,10 @@ class _SearchScreenState extends State<SearchScreen> {
   StreamSubscription? _subscription;
   
   List<dynamic> _suggestions = [];
+  Map<String, dynamic>? _detectedLocation;
   bool _isSearching = false;
   bool _isLocating = false;
+  String? _locationError;
 
   @override
   void initState() {
@@ -50,7 +53,12 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    setState(() => _isSearching = true);
+    setState(() {
+      _isSearching = true;
+      _detectedLocation = null;
+      _locationError = null; // Clear any previous errors
+    });
+    
     try {
       final results = await _apiService.getSuggestions(query);
       if (mounted) {
@@ -59,40 +67,66 @@ class _SearchScreenState extends State<SearchScreen> {
           _isSearching = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isSearching = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+          _locationError = "Unable to search locations. Please check your connection.";
+        });
+      }
     }
   }
 
-  Future<void> _useCurrentLocation(WeatherProvider provider) async {
-    setState(() => _isLocating = true);
+  Future<void> _detectCurrentLocation() async {
+    setState(() {
+      _isLocating = true;
+      _locationError = null;
+      _detectedLocation = null;
+      _suggestions = [];
+      _controller.clear();
+    });
+
     try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw 'Location services are disabled.';
+      }
+
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw 'Location permissions are denied';
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Location permissions are permanently denied. Please enable them in settings.';
       }
 
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        final position = await Geolocator.getCurrentPosition();
-        await provider.loadWeather(
-          'Current Location', 
-          lat: position.latitude, 
-          lon: position.longitude
-        );
-        if (mounted && provider.errorMessage.isEmpty) {
-          Navigator.pop(context);
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission denied')),
-        );
+      // Use a timeout to avoid getting stuck
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+
+      final result = await _apiService.reverseGeocode(position.latitude, position.longitude);
+      
+      if (mounted) {
+        setState(() {
+          _detectedLocation = result;
+          _isLocating = false;
+        });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error getting location: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isLocating = false);
+      if (mounted) {
+        setState(() {
+          _locationError = e.toString();
+          _isLocating = false;
+        });
+      }
     }
   }
 
@@ -120,15 +154,42 @@ class _SearchScreenState extends State<SearchScreen> {
                   child: ListView(
                     physics: const BouncingScrollPhysics(),
                     children: [
-                      if (_controller.text.isEmpty) _buildCurrentLocationButton(provider),
+                      if (_isLocating) 
+                        _buildStatusCard(
+                          icon: const CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF3FA9A0)),
+                          title: 'Detecting location...',
+                          subtitle: 'Consulting satellites for your coordinates',
+                        )
+                      else if (_locationError != null)
+                        _buildStatusCard(
+                          icon: const Icon(Icons.location_off, color: Colors.redAccent),
+                          title: 'Error',
+                          subtitle: _locationError!,
+                          action: TextButton(
+                            onPressed: () {
+                              if (_controller.text.length >= 2) {
+                                _fetchSuggestions(_controller.text);
+                              } else {
+                                _detectCurrentLocation();
+                              }
+                            },
+                            child: const Text('Retry', style: TextStyle(color: Color(0xFF3FA9A0))),
+                          ),
+                        )
+                      else if (_detectedLocation != null)
+                        _buildDetectedLocationCard(_detectedLocation!, provider)
+                      else if (_controller.text.isEmpty)
+                        _buildCurrentLocationTrigger(),
+
                       if (_isSearching) _buildLoadingIndicator(),
+                      
                       if (_suggestions.isNotEmpty) ...[
                         _sectionLabel('SEARCH RESULTS'),
                         ..._suggestions.map((s) => _buildResultItem(s, provider)).toList(),
-                      ] else if (_controller.text.length >= 2 && !_isSearching)
+                      ] else if (_controller.text.length >= 2 && !_isSearching && _locationError == null)
                         _buildNoResults(),
                       
-                      if (provider.history.isNotEmpty && _suggestions.isEmpty && !_isSearching) ...[
+                      if (provider.history.isNotEmpty && _suggestions.isEmpty && !_isSearching && _detectedLocation == null) ...[
                         const SizedBox(height: 32),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -162,9 +223,12 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
       child: TextField(
         controller: _controller,
-        autofocus: true,
+        autofocus: false,
         style: const TextStyle(color: Colors.white),
-        onChanged: (val) => _searchSubject.add(val),
+        onChanged: (val) {
+          if (val.length >= 2) setState(() => _isSearching = true);
+          _searchSubject.add(val);
+        },
         decoration: InputDecoration(
           hintText: 'Enter city name...',
           hintStyle: const TextStyle(color: Colors.grey),
@@ -182,36 +246,97 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildCurrentLocationButton(WeatherProvider provider) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      child: InkWell(
-        onTap: () => _useCurrentLocation(provider),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(0xFF3FA9A0).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF3FA9A0).withOpacity(0.3)),
-          ),
-          child: Row(
-            children: [
-              _isLocating 
-                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF3FA9A0)))
-                : const Icon(Icons.my_location, color: Color(0xFF3FA9A0)),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Use my current location', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
-                  const Text('Detects your city automatically', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              ),
-            ],
-          ),
+  Widget _buildCurrentLocationTrigger() {
+    return InkWell(
+      onTap: _detectCurrentLocation,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF3FA9A0).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF3FA9A0).withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.my_location, color: Color(0xFF3FA9A0)),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Use my current location', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.bold, color: Colors.white)),
+                const Text('Detects your city automatically', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStatusCard({required Widget icon, required String title, required String subtitle, Widget? action}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111727),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: 24, height: 24, child: icon),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          ),
+          if (action != null) action,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetectedLocationCard(Map<String, dynamic> location, WeatherProvider provider) {
+    final name = location['name'] ?? 'Detected Location';
+    final state = location['state'];
+    final country = location['country'] ?? '';
+    final lat = location['lat'];
+    final lon = location['lon'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel('CURRENT LOCATION'),
+        Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF3FA9A0).withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF3FA9A0)),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(20),
+            leading: const CircleAvatar(
+              backgroundColor: Color(0xFF3FA9A0),
+              child: Icon(Icons.location_on, color: Colors.white),
+            ),
+            title: Text(name, style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            subtitle: Text("${state != null ? '$state, ' : ''}$country", style: const TextStyle(color: Colors.white70)),
+            trailing: const Icon(Icons.check_circle, color: Color(0xFF3FA9A0)),
+            onTap: () async {
+              await provider.loadWeather(name, lat: lat, lon: lon);
+              if (mounted && provider.errorMessage.isEmpty) {
+                Navigator.pop(context);
+              }
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -241,7 +366,15 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 16),
         onTap: () async {
-          await provider.loadWeather(name, lat: lat, lon: lon);
+          // Store full info in history
+          final fullInfo = {
+            'name': name,
+            'state': state,
+            'country': country,
+            'lat': lat,
+            'lon': lon,
+          };
+          await provider.loadWeather(name, lat: lat, lon: lon, extra: fullInfo);
           if (mounted && provider.errorMessage.isEmpty) {
             Navigator.pop(context);
           }
@@ -251,31 +384,41 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildRecentSearches(WeatherProvider provider) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: provider.history.map((city) => InkWell(
-        onTap: () => provider.loadWeather(city).then((_) {
-          if (mounted && provider.errorMessage.isEmpty) Navigator.pop(context);
-        }),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    return Column(
+      children: provider.history.map((historyItem) {
+        Map<String, dynamic> data;
+        try {
+          data = json.decode(historyItem);
+        } catch (_) {
+          data = {'name': historyItem, 'country': ''};
+        }
+
+        final name = data['name'] ?? 'Unknown';
+        final state = data['state'];
+        final country = data['country'] ?? '';
+        final lat = data['lat'];
+        final lon = data['lon'];
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF111727),
+            color: const Color(0xFF111727).withOpacity(0.3),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.history, color: Colors.grey, size: 14),
-              const SizedBox(width: 8),
-              Text(city, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-            ],
+          child: ListTile(
+            dense: true,
+            leading: const Icon(Icons.history, color: Colors.grey, size: 18),
+            title: Text(name, style: const TextStyle(color: Colors.white, fontSize: 14)),
+            subtitle: country.isNotEmpty 
+              ? Text("${state != null ? '$state, ' : ''}$country", style: const TextStyle(color: Colors.grey, fontSize: 11))
+              : null,
+            onTap: () {
+              provider.loadWeather(name, lat: lat, lon: lon);
+              Navigator.pop(context);
+            },
           ),
-        ),
-      )).toList(),
+        );
+      }).toList(),
     );
   }
 
