@@ -95,7 +95,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         _buildDatasetCard(summary),
         const SizedBox(height: 32),
         
-        _sectionHeader('MODEL PERFORMANCE'),
+        _sectionHeader('AI MODEL PERFORMANCE (NASA HISTORICAL)'),
         _buildPerformanceCard('Temperature', 'temperature', bestModels),
         _buildPerformanceCard('Humidity', 'humidity', bestModels),
         _buildPerformanceCard('Rainfall', 'rainfall', bestModels),
@@ -105,7 +105,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         _buildComparisonChart(metrics),
         const SizedBox(height: 32),
 
-        _sectionHeader('AI INTELLIGENCE'),
+        _sectionHeader('AI ANALYTICAL INSIGHTS'),
         ...insights.map((i) => _buildInsightCard(i)).toList(),
         const SizedBox(height: 40),
       ],

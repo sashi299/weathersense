@@ -300,162 +300,83 @@ def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[fl
 
 def predict_next_7_days(city: str, lat: Optional[float] = None, lon: Optional[float] = None) -> Dict[str, Any]:
     validated_city = validate_input(city)
-    load_inference_artifacts()
 
-    # 1. Get current state as the starting point
-    current = get_current_weather(validated_city, lat=lat, lon=lon)
-    current_temp = current["temperature_c"]
-    current_hum = current["humidity"]
-    current_rain = 0.0 # Today's rain so far (not used as lag here)
+    # 1. Coordinate Resolution (if needed)
+    if lat is None or lon is None:
+        api_key = get_api_key()
+        try:
+            geo_res = requests.get(
+                "https://api.openweathermap.org/geo/1.0/direct",
+                params={"q": validated_city, "limit": 1, "appid": api_key},
+                timeout=5
+            )
+            geo_data = geo_res.json()
+            if geo_data:
+                lat, lon = geo_data[0].get("lat"), geo_data[0].get("lon")
+            else:
+                raise ValueError(f"Could not resolve coordinates for {validated_city}")
+        except Exception as e:
+            logger.error(f"Geo-resolution failed: {e}")
+            raise RuntimeError(f"Coordinate resolution failed: {e}")
 
-    # 2. Generate 7 Days of Daily AI Predictions using XGBoost
-    # To predict 7 days, we'll use the current weather to initialize lags
-    # and then recursively predict each day.
+    # 2. Fetch REAL Hourly Forecast from Open-Meteo
+    try:
+        url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "hourly": "temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,pressure_msl",
+            "timezone": "auto",
+            "forecast_days": 7
+        }
+        res = requests.get(url, params=params, timeout=10)
+        res.raise_for_status()
+        data = res.json()
 
-    daily_predictions = []
+        hourly = data.get("hourly", {})
+        times = hourly.get("time", [])
+        temps = hourly.get("temperature_2m", [])
+        hums = hourly.get("relative_humidity_2m", [])
+        precips = hourly.get("precipitation", [])
+        probs = hourly.get("precipitation_probability", [])
+        codes = hourly.get("weather_code", [])
 
-    # Initialize history with current data (Day 0)
-    # Using current weather to fill lag_1
-    history = {
-        "temp": [current_temp] * 7, # Simplified history for lags
-        "hum": [current_hum] * 7,
-        "rain": [0.0] * 7
-    }
+        forecasts = []
+        for i in range(len(times)):
+            dt = datetime.fromisoformat(times[i])
 
-    start_dt = datetime.now(timezone.utc)
+            # Map Open-Meteo WMO Codes to internal conditions
+            wmo = codes[i]
+            condition = "Clear"
+            if wmo == 0: condition = "Sunny" if 6 <= dt.hour <= 18 else "Clear Night"
+            elif wmo in [1, 2, 3]: condition = "Partly Cloudy"
+            elif wmo in [45, 48]: condition = "Fog"
+            elif wmo in [51, 53, 55, 61, 63, 65, 80, 81, 82]: condition = "Rainy"
+            elif wmo in [71, 73, 75, 85, 86]: condition = "Snowy"
+            elif wmo in [95, 96, 99]: condition = "Thunderstorm"
+            else: condition = "Cloudy"
 
-    for d in range(1, 8):
-        target_date = start_dt + timedelta(days=d)
+            forecasts.append({
+                "date": dt.strftime("%Y-%m-%d"),
+                "time": dt.strftime("%H:%M"),
+                "temp": float(temps[i]),
+                "humidity": float(hums[i]),
+                "rainfall_mm": float(precips[i]),
+                "condition": condition,
+                "confidence": float(1.0 - (probs[i] / 200.0))
+            })
 
-        # Build features for this day
-        # Order: day_of_week, month, quarter, sin_day_of_year, cos_day_of_year,
-        # temperature_lag_1, temperature_lag_3, temperature_lag_7,
-        # humidity_lag_1, rainfall_lag_1,
-        # temperature_3day_avg, temperature_7day_avg, humidity_7day_avg, rainfall_7day_avg,
-        # temperature_7day_std, temperature_difference
+        return {
+            "city": validated_city,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "forecast": forecasts,
+            "resolution": "hourly",
+            "source": "Open-Meteo"
+        }
 
-        day_of_year = target_date.timetuple().tm_yday
-        features = [
-            float(current.get("wind_speed", 3.0)), # wind_speed
-            float(current.get("pressure", 1013.0)), # pressure
-            target_date.weekday(), # day_of_week
-            target_date.month,
-            (target_date.month - 1) // 3 + 1, # quarter
-            np.sin(2 * np.pi * day_of_year / 365),
-            np.cos(2 * np.pi * day_of_year / 365),
-            history["temp"][-1], # lag_1
-            history["temp"][-3], # lag_3
-            history["temp"][-7], # lag_7
-            history["hum"][-1],  # hum lag_1
-            history["rain"][-1], # rain lag_1
-            np.mean(history["temp"][-3:]), # 3day avg
-            np.mean(history["temp"]),      # 7day avg
-            np.mean(history["hum"]),       # 7day hum avg
-            np.mean(history["rain"]),      # 7day rain avg
-            np.std(history["temp"]),       # 7day std
-            history["temp"][-1] - history["temp"][-2] # temp diff
-        ]
-
-        X = np.array([features])
-
-        # Use AI models
-        p_temp = float(_MODELS["temperature"].predict(X)[0]) if "temperature" in _MODELS else 25.0
-        p_hum = float(_MODELS["humidity"].predict(X)[0]) if "humidity" in _MODELS else 60.0
-        p_rain = float(_MODELS["rainfall"].predict(X)[0]) if "rainfall" in _MODELS else 0.0
-
-        # Bound sanity
-        p_hum = max(10, min(100, p_hum))
-        p_rain = max(0, p_rain)
-
-        daily_predictions.append({
-            "date": target_date.strftime("%Y-%m-%d"),
-            "temp_avg": p_temp,
-            "hum_avg": p_hum,
-            "rain_total": p_rain
-        })
-
-        # Update history for next day prediction
-        history["temp"].append(p_temp)
-        history["temp"].pop(0)
-        history["hum"].append(p_hum)
-        history["hum"].pop(0)
-        history["rain"].append(p_rain)
-        history["rain"].pop(0)
-
-    # 3. Generate 168 Hourly points (Interpolated and Clamped)
-    # We anchor the curve at Hour 0 = Current Temp
-    # And we follow the AI-predicted daily trend.
-
-    forecasts = []
-
-    for i in range(1, 169):
-        target_time = start_dt + timedelta(hours=i)
-        day_idx = i // 24 if i % 24 != 0 else (i // 24) - 1
-        day_idx = min(day_idx, 6)
-
-        daily_ai = daily_predictions[day_idx]
-
-        # Diurnal Cycle Model
-        # Peak usually at 3-4 PM (Hour 15), Minimum at 5-6 AM (Hour 5)
-        hour = target_time.hour
-        # Amplitude of variation (approx 4-6 degrees)
-        amplitude = 5.0
-        cycle = -np.cos((hour - 5) * (2 * np.pi / 24)) * amplitude
-
-        # Baseline is the AI-predicted daily average
-        # Target Temp = AI Average + Diurnal offset (centered around avg)
-        target_temp = daily_ai["temp_avg"] + cycle
-
-        # SMOOTH TRANSITION: Anchor to current weather
-        # We apply a weight that decreases over time (Decay anchor)
-        # For the first 12 hours, we blend current weather with the AI curve.
-        # This prevents the 33C -> 39C jump.
-
-        decay_factor = np.exp(-i / 12) # Influence of current weather drops over 12-18 hours
-        # The offset between current weather and the "ideal" model curve at t=0
-        ideal_start_cycle = -np.cos((start_dt.hour - 5) * (2 * np.pi / 24)) * amplitude
-        initial_offset = current_temp - (daily_predictions[0]["temp_avg"] + ideal_start_cycle)
-
-        predicted_temp = target_temp + (initial_offset * decay_factor)
-
-        # Humidity variation (Inverse of temp)
-        predicted_humidity = daily_ai["hum_avg"] - (cycle * 1.5)
-        predicted_humidity = max(20, min(100, predicted_humidity))
-
-        # Rainfall (Distribute total rain)
-        # If it's a rainy day, show it in the evening/early morning slots
-        rainfall = 0.0
-        if daily_ai["rain_total"] > 0.5:
-            # Simple probability: peak rain at night or early morning
-            rain_prob = np.sin((hour) * (2 * np.pi / 24)) + 1.0 # 0 to 2
-            if rain_prob > 1.5:
-                rainfall = round(daily_ai["rain_total"] / 4.0, 1)
-
-        # Condition logic
-        condition = "Clear"
-        if rainfall > 0.5: condition = "Rainy"
-        elif predicted_humidity > 85: condition = "Overcast"
-        elif predicted_humidity > 70: condition = "Cloudy"
-        else:
-            condition = "Sunny" if 6 <= hour <= 18 else "Clear Night"
-
-        forecasts.append({
-            "date": target_time.strftime("%Y-%m-%d"),
-            "time": target_time.strftime("%H:%M"),
-            "temp": round(float(predicted_temp), 1),
-            "humidity": round(float(predicted_humidity), 1),
-            "rainfall_mm": float(rainfall),
-            "condition": condition,
-            "confidence": round(float(0.9 - (i * 0.002)), 2)
-        })
-
-    return {
-        "city": validated_city,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "forecast": forecasts,
-        "resolution": "hourly",
-        "model": "XGBoost-Recursive"
-    }
+    except Exception as e:
+        logger.error(f"External forecast provider failed: {e}")
+        raise RuntimeError(f"Real-time forecast unavailable: {e}")
 
 def _build_fallback_weather(city: str) -> Dict[str, Any]:
     return {

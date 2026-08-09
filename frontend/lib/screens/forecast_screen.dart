@@ -13,13 +13,22 @@ class ForecastScreen extends StatelessWidget {
       appBar: AppBar(
         title: Column(
           children: [
-            const Text('AI Hourly Forecast'),
-            Text('7-Day Predictive Model', style: GoogleFonts.spaceGrotesk(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
+            const Text('7-Day Weather Forecast'),
+            Text('Hourly Numerical Prediction', style: GoogleFonts.spaceGrotesk(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
           ],
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        color: const Color(0xFF0B1220),
+        child: Text(
+          'Forecast data: Open-Meteo',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.spaceGrotesk(fontSize: 10, color: Colors.grey.withValues(alpha: 0.5)),
+        ),
       ),
       body: Consumer<WeatherProvider>(
         builder: (context, provider, _) {
