@@ -6,8 +6,8 @@ class ApiService {
   /// Base URL for the weather API.
   /// Defaults to production Render deployment.
   /// Can be overridden at build time using:
-  /// --dart-define=API_BASE_URL=https://weathersense-backend.onrender.com
-  static const String defaultRenderUrl = 'https://weathersense-backend.onrender.com';
+  /// --dart-define=API_BASE_URL=https://weathersense-mfo2.onrender.com
+  static const String defaultRenderUrl = 'https://weathersense-mfo2.onrender.com';
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: defaultRenderUrl,
