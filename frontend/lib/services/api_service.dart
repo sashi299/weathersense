@@ -4,11 +4,13 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   /// Base URL for the weather API.
+  /// Defaults to production Render deployment.
   /// Can be overridden at build time using:
-  /// --dart-define=API_BASE_URL=http://10.169.34.226:8000
+  /// --dart-define=API_BASE_URL=https://weathersense-backend.onrender.com
+  static const String defaultRenderUrl = 'https://weathersense-backend.onrender.com';
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://weathersense-backend-production.up.railway.app',
+    defaultValue: defaultRenderUrl,
   );
 
   Future<Map<String, dynamic>> getCurrentWeather(String city, {double? lat, double? lon}) async {

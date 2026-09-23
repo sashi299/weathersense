@@ -74,6 +74,23 @@ def load_processed_datasets(data_dir: Optional[Path | str] = None) -> Dict[str, 
         datasets[split_name] = pd.read_csv(path)
     return datasets
 
+
+def load_model(model_path: Path | str) -> Any:
+    """Load a saved model from disk."""
+    path = Path(model_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Model file not found: {path}")
+    if path.suffix == ".keras" and tf is not None:
+        return tf.keras.models.load_model(path)
+    return joblib.load(path)
+
+
+def select_best_model(results: List[Dict[str, Any]]) -> str:
+    """Select the best model by lowest RMSE."""
+    if not results:
+        raise ValueError("At least one model result is required")
+    return min(results, key=lambda result: result["rmse"])["model"]
+
 def _calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
     y_pred = np.maximum(y_pred, 0) # Physical constraints (no negative rain/humidity)
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))

@@ -103,6 +103,7 @@ def engineer_features(data: pd.DataFrame, date_column: str = "date") -> pd.DataF
     # Time features (global)
     features["day_of_week"] = features[date_column].dt.dayofweek
     features["month"] = features[date_column].dt.month
+    features["week_of_year"] = features[date_column].dt.isocalendar().week.astype(int)
     features["quarter"] = features[date_column].dt.quarter
     features["day_of_year"] = features[date_column].dt.dayofyear
     features["sin_day_of_year"] = np.sin(2 * np.pi * features["day_of_year"] / 365)

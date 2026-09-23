@@ -2,9 +2,15 @@ services:
   - type: web
     name: weathersense-backend
     env: python
-    buildCommand: pip install -r backend/requirements.txt
+    plan: free
+    region: oregon
+    buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
     startCommand: sh start.sh
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: OPENWEATHER_API_KEY
         sync: false
       - key: ADMIN_KEY

@@ -50,6 +50,17 @@ SERVICE = ForecastService()
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
 
+@app.get("/")
+def root() -> dict:
+    return {
+        "service": "WeatherSense API",
+        "status": "online",
+        "deployed_on": "Render",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health")
 def health() -> dict:
     api_key = get_api_key()

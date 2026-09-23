@@ -81,6 +81,25 @@ Preprocessing and training modules live in `backend/ml/`.
 - **JDK 25 Compatibility**: The project uses Groovy Gradle files to maximize compatibility, but JDK 25 is still too new for Gradle 8.10. Use JDK 17 or 21 for building Android artifacts.
 - **Fonts**: Local font files were replaced with `google_fonts` to ensure production stability without large binary assets.
 
+## Deployment to Render
+
+WeatherSense is configured for automated deployment on [Render](https://render.com).
+
+### Render Blueprint Deployment (Recommended)
+
+1. Push this repository to your GitHub account (`git push -u origin main`).
+2. Log in to [Render Dashboard](https://dashboard.render.com).
+3. Click **New +** > **Blueprint**.
+4. Select your `weathersense` repository. Render reads [render.yaml](render.yaml) automatically.
+5. Set the required environment variables in the Render Dashboard:
+   - `OPENWEATHER_API_KEY`: Your OpenWeatherMap API key
+   - `ADMIN_KEY`: Secret key for protected training endpoints
+6. Click **Apply**. Render will automatically build the service and deploy it with a persistent public URL (`https://<service-name>.onrender.com`).
+
+### Docker Deployment
+
+You can also deploy as a Docker Web Service on Render using the included [Dockerfile](Dockerfile). Render assigns `$PORT` dynamically, which is handled automatically by `start.sh`.
+
 ## Architecture
 
 ```mermaid
