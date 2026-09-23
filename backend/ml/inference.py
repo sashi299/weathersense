@@ -141,7 +141,7 @@ def get_api_key() -> str:
         val = os.getenv(k, "").strip()
         if val:
             return val
-    return ""
+    return "db41ab449fa4a5a7ad97e93b644e9cf2"
 
 def get_current_weather(city: str, lat: Optional[float] = None, lon: Optional[float] = None) -> Dict[str, Any]:
     validated_city = validate_input(city)

@@ -12,6 +12,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: OPENWEATHER_API_KEY
-        sync: false
+        value: db41ab449fa4a5a7ad97e93b644e9cf2
       - key: ADMIN_KEY
-        sync: false
+        value: weathersense_admin_secret
