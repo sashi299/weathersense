@@ -100,6 +100,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
       actions: [
         IconButton(
+          tooltip: '7-Day Forecast',
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ForecastScreen())),
+          icon: const Icon(Icons.timeline_rounded, color: Colors.white, size: 20),
+        ),
+        IconButton(
+          tooltip: 'AI Analytics',
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AnalyticsScreen())),
+          icon: const Icon(Icons.auto_graph_rounded, color: Colors.white, size: 20),
+        ),
+        IconButton(
+          tooltip: 'Search Locations',
           onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen())),
           icon: const Icon(Icons.location_searching_rounded, color: Colors.white, size: 20),
         ),
@@ -242,22 +253,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _miniAction(String label, IconData icon, VoidCallback onTap) {
     return Expanded(
-      child: InkWell(
-        onTap: onTap,
+      child: Material(
+        color: const Color(0xFF111727).withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF111727).withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF3FA9A0).withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: const Color(0xFF3FA9A0), size: 20),
-              const SizedBox(height: 6),
-              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-            ],
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF3FA9A0).withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              children: [
+                Icon(icon, color: const Color(0xFF3FA9A0), size: 20),
+                const SizedBox(height: 6),
+                Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
         ),
       ),

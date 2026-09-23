@@ -114,7 +114,7 @@ class ApiService {
       final encodedQuery = Uri.encodeQueryComponent(query);
       final response = await http
           .get(Uri.parse('$baseUrl/search?q=$encodedQuery'))
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         return json.decode(response.body) as List<dynamic>;
